@@ -1,0 +1,19 @@
+# Local and generated files
+.next
+node_modules
+.vercel
+*.tsbuildinfo
+
+# Secrets — configure these in Vercel Project Settings instead
+.env
+.env.local
+.env.*.local
+
+# Documentation that is not needed by the deployment bundle
+DEPLOYMENT.md
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.vscode
+.idea

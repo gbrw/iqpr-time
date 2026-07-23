@@ -1,0 +1,507 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "IQPR Time",
+    "description": "REST API احترافية ومجانية لمواقيت الصلاة في جميع محافظات ومدن العراق.\n\nالبيانات مُجمَّعة من جداول ديوان الوقف السني السنوية.\n\n> **ملاحظة**: هذه الخدمة مشروع تقني مستقل وغير تابعة رسمياً لديوان الوقف السني.\n\n## المميزات\n- 19 محافظة، 121 مدينة وناحية\n- بحث بالاسم العربي، الإنجليزي، أو الـ slug\n- استعلامات اليوم / الشهر / السنة\n- Rate Limiting: 100 req/min\n- CORS مفتوح للجميع",
+    "version": "1.0.0",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Current Server"
+    },
+    {
+      "url": "https://iqpr-time.vercel.app/api/v1",
+      "description": "Production Server"
+    }
+  ],
+  "tags": [
+    { "name": "Governorates", "description": "المحافظات" },
+    { "name": "Cities", "description": "المدن" },
+    { "name": "Prayer Times", "description": "مواقيت الصلاة" },
+    { "name": "Search", "description": "البحث" },
+    { "name": "System", "description": "معلومات النظام" }
+  ],
+  "paths": {
+    "/governorates": {
+      "get": {
+        "tags": ["Governorates"],
+        "summary": "جميع المحافظات",
+        "description": "يُرجع قائمة جميع المحافظات في العراق مع عدد المدن",
+        "operationId": "getGovernorates",
+        "responses": {
+          "200": {
+            "description": "نجاح",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GovernoratesResponse" },
+                "example": {
+                  "success": true,
+                  "source": { "name": "ديوان الوقف السني", "official_affiliation": false, "notice": "مشروع تقني مستقل" },
+                  "data": {
+                    "count": 19,
+                    "governorates": [
+                      { "id": 1, "name_ar": "بغداد", "name_en": "Baghdad", "slug": "baghdad", "cities_count": 5 }
+                    ]
+                  },
+                  "meta": { "version": 1, "timezone": "Asia/Baghdad", "last_updated": "2026-07-23T00:00:00Z" }
+                }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/cities": {
+      "get": {
+        "tags": ["Cities"],
+        "summary": "قائمة المدن",
+        "description": "يُرجع قائمة المدن، مع إمكانية التصفية حسب المحافظة",
+        "operationId": "getCities",
+        "parameters": [
+          {
+            "name": "governorate",
+            "in": "query",
+            "description": "slug المحافظة",
+            "required": false,
+            "schema": { "type": "string", "example": "baghdad" }
+          },
+          {
+            "name": "governorate_id",
+            "in": "query",
+            "description": "معرّف المحافظة الرقمي",
+            "required": false,
+            "schema": { "type": "integer", "example": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "نجاح",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CitiesResponse" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/prayer-times": {
+      "get": {
+        "tags": ["Prayer Times"],
+        "summary": "مواقيت يوم محدد (query params)",
+        "operationId": "getPrayerTimesByQuery",
+        "parameters": [
+          {
+            "name": "city",
+            "in": "query",
+            "required": true,
+            "description": "slug أو اسم المدينة",
+            "schema": { "type": "string", "example": "baghdad-center" }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "description": "التاريخ بصيغة YYYY-MM-DD أو 'today'",
+            "schema": { "type": "string", "example": "2026-07-17" }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/PrayerTimeSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/prayer-times/{city}/{date}": {
+      "get": {
+        "tags": ["Prayer Times"],
+        "summary": "مواقيت يوم محدد (path params)",
+        "operationId": "getPrayerTimesByPath",
+        "parameters": [
+          {
+            "name": "city",
+            "in": "path",
+            "required": true,
+            "description": "slug أو اسم المدينة (يدعم العربي والإنجليزي)",
+            "schema": { "type": "string", "example": "baghdad-center" }
+          },
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "description": "التاريخ بصيغة YYYY-MM-DD أو 'today'",
+            "schema": { "type": "string", "example": "2026-07-17" }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/PrayerTimeSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/prayer-times/today": {
+      "get": {
+        "tags": ["Prayer Times"],
+        "summary": "مواقيت اليوم الحالي",
+        "description": "يُرجع مواقيت اليوم الحالي بتوقيت بغداد (Asia/Baghdad)",
+        "operationId": "getTodayPrayerTimes",
+        "parameters": [
+          {
+            "name": "city",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "baghdad-center" }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/PrayerTimeSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/prayer-times/month": {
+      "get": {
+        "tags": ["Prayer Times"],
+        "summary": "مواقيت شهر كامل",
+        "operationId": "getMonthPrayerTimes",
+        "parameters": [
+          {
+            "name": "city",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "mosul" }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 12, "example": 7 }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "example": 2026 }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/PrayerTimeMonthSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/prayer-times/year": {
+      "get": {
+        "tags": ["Prayer Times"],
+        "summary": "مواقيت سنة كاملة",
+        "operationId": "getYearPrayerTimes",
+        "parameters": [
+          {
+            "name": "city",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "najaf-city" }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "example": 2026 }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/PrayerTimeYearSuccess" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/search/cities": {
+      "get": {
+        "tags": ["Search"],
+        "summary": "البحث عن مدينة",
+        "description": "يبحث في الاسم العربي، الإنجليزي، والـ slug",
+        "operationId": "searchCities",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "نص البحث",
+            "schema": { "type": "string", "example": "بغداد" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 20, "maximum": 50 }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/SearchSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "tags": ["System"],
+        "summary": "إصدار البيانات والإحصائيات",
+        "operationId": "getVersion",
+        "responses": {
+          "200": {
+            "description": "نجاح",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "حالة الخدمة",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "الخدمة تعمل",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "enum": ["healthy", "degraded"] },
+                    "timestamp": { "type": "string", "format": "date-time" },
+                    "response_time_ms": { "type": "integer" },
+                    "checks": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "503": { "description": "الخدمة متوقفة أو متأثرة" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PrayerTimes": {
+        "type": "object",
+        "properties": {
+          "fajr":    { "type": "string", "example": "03:35", "description": "الفجر (HH:MM 24h)" },
+          "sunrise": { "type": "string", "example": "05:15", "description": "الشروق" },
+          "dhuhr":   { "type": "string", "example": "12:15", "description": "الظهر" },
+          "asr":     { "type": "string", "example": "15:45", "description": "العصر" },
+          "maghrib": { "type": "string", "example": "19:30", "description": "المغرب" },
+          "isha":    { "type": "string", "example": "21:00", "description": "العشاء" }
+        }
+      },
+      "City": {
+        "type": "object",
+        "properties": {
+          "id":       { "type": "integer" },
+          "name_ar":  { "type": "string" },
+          "name_en":  { "type": "string" },
+          "slug":     { "type": "string" },
+          "governorate": {
+            "type": "object",
+            "properties": {
+              "name_ar": { "type": "string" },
+              "name_en": { "type": "string" },
+              "slug":    { "type": "string" }
+            }
+          }
+        }
+      },
+      "Governorate": {
+        "type": "object",
+        "properties": {
+          "id":           { "type": "integer" },
+          "name_ar":      { "type": "string" },
+          "name_en":      { "type": "string" },
+          "slug":         { "type": "string" },
+          "cities_count": { "type": "integer" }
+        }
+      },
+      "SourceInfo": {
+        "type": "object",
+        "properties": {
+          "name":                 { "type": "string", "example": "ديوان الوقف السني" },
+          "official_affiliation": { "type": "boolean", "example": false },
+          "notice":               { "type": "string" }
+        }
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "version":      { "type": "integer" },
+          "timezone":     { "type": "string", "example": "Asia/Baghdad" },
+          "last_updated": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "source":  { "$ref": "#/components/schemas/SourceInfo" },
+          "data":    { "type": "object" },
+          "meta":    { "$ref": "#/components/schemas/Meta" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code":    { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      },
+      "GovernoratesResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ApiResponse" },
+          {
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "count": { "type": "integer" },
+                  "governorates": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/Governorate" }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "CitiesResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ApiResponse" },
+          {
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "count": { "type": "integer" },
+                  "cities": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/City" }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "responses": {
+      "PrayerTimeSuccess": {
+        "description": "مواقيت الصلاة ليوم واحد",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/ApiResponse" },
+                {
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "city": { "$ref": "#/components/schemas/City" },
+                        "date": { "type": "string", "format": "date" },
+                        "prayer_times": { "$ref": "#/components/schemas/PrayerTimes" }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "PrayerTimeMonthSuccess": {
+        "description": "مواقيت الصلاة لشهر كامل",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiResponse" }
+          }
+        }
+      },
+      "PrayerTimeYearSuccess": {
+        "description": "مواقيت الصلاة لسنة كاملة",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiResponse" }
+          }
+        }
+      },
+      "SearchSuccess": {
+        "description": "نتائج البحث",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiResponse" }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "طلب غير صالح",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "المورد المطلوب غير موجود",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "تجاوزت الحد المسموح",
+        "headers": {
+          "Retry-After": { "schema": { "type": "integer" } },
+          "X-RateLimit-Limit": { "schema": { "type": "integer" } }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "خطأ داخلي في الخادم",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    }
+  }
+}
