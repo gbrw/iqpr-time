@@ -80,7 +80,7 @@ a { color: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .field { display: grid; gap: 8px; min-width: 0; }
 .field label { color: var(--ink); font-size: .82rem; font-weight: 800; }
-.input-wrap { position: relative; min-width: 0; width: 100%; overflow: hidden; }
+.input-wrap { position: relative; }
 .input-icon { position: absolute; top: 50%; inset-inline-start: 14px; transform: translateY(-50%); color: #7d9695; pointer-events: none; }
 .form-control { width: 100%; min-height: 48px; padding: 0 15px; border: 1px solid #ccddd8; border-radius: 11px; outline: 0; color: var(--ink); background: #fbfdfc; transition: .2s ease; }
 .input-wrap .form-control { padding-inline-start: 43px; }
@@ -89,29 +89,59 @@ a { color: inherit; }
 .form-control:disabled { cursor: not-allowed; background: #eef3f1; color: #8a9b98; }
 select.form-control { cursor: pointer; }
 
-/* iOS Safari: keep the native date control inside its card */
-input[type="date"].form-control {
-  display: block;
+/* Stable date field across iOS Safari and other browsers */
+.date-picker-wrap {
+  position: relative;
   width: 100%;
   min-width: 0;
-  max-width: 100%;
-  inline-size: 100%;
-  min-inline-size: 0;
-  max-inline-size: 100%;
+}
+
+.date-display {
+  width: 100%;
+  min-height: 48px;
   box-sizing: border-box;
-  direction: ltr;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  border: 1px solid #ccddd8;
+  border-radius: 11px;
+  color: var(--ink);
+  background: #fbfdfc;
+  transition: .2s ease;
+  pointer-events: none;
 }
 
-input[type="date"].form-control::-webkit-date-and-time-value {
+.date-display svg {
+  flex: 0 0 auto;
+  color: #7d9695;
+}
+
+.date-display span {
+  min-width: 0;
+  flex: 1;
+  text-align: start;
+}
+
+.date-picker-wrap:focus-within .date-display {
+  border-color: var(--teal);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(13,124,117,.09);
+}
+
+.date-native-input {
+  position: absolute;
+  inset: 0;
   width: 100%;
+  height: 100%;
   min-width: 0;
-  text-align: right;
-}
-
-input[type="date"].form-control::-webkit-datetime-edit {
-  min-width: 0;
+  margin: 0;
   padding: 0;
+  opacity: 0.001;
+  border: 0;
+  cursor: pointer;
+  -webkit-appearance: auto;
+  appearance: auto;
 }
 .field-hint { color: #708380; font-size: .74rem; }
 
