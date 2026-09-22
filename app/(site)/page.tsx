@@ -59,13 +59,36 @@ export default function HomePage() {
   }, [isArabic])
 
   useEffect(() => {
-    if (!governorate) return
+    const normalizedGovernorate = governorate.trim().toLowerCase()
+    if (!normalizedGovernorate) {
+      setCities([])
+      setCity('')
+      return
+    }
+
     setLoadingCities(true)
-    fetch(`/api/v1/cities?governorate=${encodeURIComponent(governorate)}`).then(r => r.json()).then(body => {
-      if (!body.success) throw new Error()
-      setCities(body.data.cities)
-      setCity(current => body.data.cities.some((item: City) => item.slug === current) ? current : (body.data.cities[0]?.slug ?? ''))
-    }).catch(() => setError(isArabic ? 'تعذر تحميل المدن.' : 'Could not load cities.')).finally(() => setLoadingCities(false))
+    setError('')
+
+    fetch(`/api/v1/cities?governorate=${encodeURIComponent(normalizedGovernorate)}`, { cache: 'no-store' })
+      .then(async r => {
+        const body = await r.json()
+        if (!r.ok || !body.success) {
+          throw new Error(body?.error?.message || 'Could not load cities')
+        }
+        return body
+      })
+      .then(body => {
+        const nextCities: City[] = Array.isArray(body?.data?.cities) ? body.data.cities : []
+        setCities(nextCities)
+        setCity(current => nextCities.some(item => item.slug === current) ? current : (nextCities[0]?.slug ?? ''))
+      })
+      .catch(err => {
+        console.error('[home/cities]', { governorate: normalizedGovernorate, error: err })
+        setCities([])
+        setCity('')
+        setError(isArabic ? 'تعذر تحميل المدن.' : 'Could not load cities.')
+      })
+      .finally(() => setLoadingCities(false))
   }, [governorate, isArabic])
 
   async function submitQuery(event: React.FormEvent) {
