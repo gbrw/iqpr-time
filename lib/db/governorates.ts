@@ -47,9 +47,14 @@ export async function getGovernorate(
   const query = supabase.from('governorates').select('id, name_ar, name_en, slug')
 
   const { data, error } = typeof slugOrId === 'number'
-    ? await query.eq('id', slugOrId).single()
-    : await query.eq('slug', slugOrId).single()
+    ? await query.eq('id', slugOrId).maybeSingle()
+    : await query.ilike('slug', slugOrId.trim()).maybeSingle()
 
-  if (error || !data) return null
+  if (error) {
+    console.error('[getGovernorate]', { slugOrId, code: error.code, message: error.message })
+    throw new Error(error.message)
+  }
+
+  if (!data) return null
   return data as Governorate
 }
