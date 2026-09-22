@@ -2,12 +2,14 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { AlarmClock, ArrowLeft, ArrowRight, Braces, CalendarDays, Check, CheckCircle2, ChevronDown, CloudSun, Code2, Copy, Database, Globe2, LoaderCircle, LocateFixed, MapPin, MoonStar, Search, Share2, ShieldCheck, Sparkles, Sun, Sunrise, Sunset, TerminalSquare, Zap } from 'lucide-react'
+import { AlarmClock, ArrowLeft, ArrowRight, Braces, CalendarDays, CalendarRange, Check, CheckCircle2, ChevronDown, CloudSun, Code2, Copy, Database, Globe2, LoaderCircle, LocateFixed, MapPin, MoonStar, Search, Share2, ShieldCheck, Sparkles, Sun, Sunrise, Sunset, Table2, TerminalSquare, Zap } from 'lucide-react'
 import { useLanguage } from '@/components/site/LanguageProvider'
 
 type Governorate = { id: number; name_ar: string; name_en: string; slug: string }
 type City = { id: number; name_ar: string; name_en: string; slug: string }
 type PrayerResult = { city: { name_ar: string; name_en: string; slug: string; governorate: { name_ar: string; name_en: string } }; date: string; prayer_times: Record<string, string> }
+type WeekDay = { date: string; fajr: string; sunrise: string; dhuhr: string; asr: string; maghrib: string; isha: string }
+type WeekResult = { city: PrayerResult['city']; start_date: string; end_date: string; count: number; days: WeekDay[] }
 
 const prayerIcons = [AlarmClock, Sunrise, Sun, CloudSun, Sunset, MoonStar]
 const prayerKeys = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha']
@@ -28,6 +30,9 @@ export default function HomePage() {
   const [resultCopied, setResultCopied] = useState(false)
   const [locating, setLocating] = useState(false)
   const [sharingStory, setSharingStory] = useState(false)
+  const [weekResult, setWeekResult] = useState<WeekResult | null>(null)
+  const [loadingWeek, setLoadingWeek] = useState(false)
+  const [weekError, setWeekError] = useState('')
 
   const text = isArabic ? {
     eyebrow: 'الواجهة العراقية المفتوحة لمواقيت الصلاة', titleA: 'مواقيت دقيقة.', titleB: 'استعلام واحد بسيط.',
@@ -35,7 +40,7 @@ export default function HomePage() {
     try: 'جرّب الاستعلام', docs: 'اقرأ التوثيق', free: 'مجانية بالكامل', noAccount: 'لا تحتاج حساباً', timezone: 'بتوقيت بغداد',
     queryTitle: 'اعرف مواقيت مدينتك', querySub: 'اختر المكان والتاريخ لتحصل على النتيجة فوراً.', gov: 'المحافظة', city: 'المدينة', date: 'التاريخ',
     selectGov: 'اختر المحافظة', selectCity: 'اختر المدينة', loadingCities: 'جاري تحميل المدن...', search: 'عرض المواقيت', searching: 'جاري الاستعلام...',
-    error: 'تعذر جلب البيانات. تحقق من اختياراتك وحاول مجدداً.', missing: 'اختر مدينة وتاريخاً صالحاً أولاً.', copy: 'نسخ رابط API', copied: 'تم النسخ', raw: 'فتح JSON', useLocation: 'استخدم موقعي', locating: 'جارٍ تحديد موقعك...', locationError: 'تعذر تحديد أقرب مدينة. تأكد من السماح للموقع ثم حاول مجدداً.', share: 'مشاركة كصورة', sharing: 'جاري تجهيز الصورة...', copyTimes: 'نسخ المواقيت', timesCopied: 'تم نسخ المواقيت', prayerTimesFor: 'مواقيت الصلاة في',
+    error: 'تعذر جلب البيانات. تحقق من اختياراتك وحاول مجدداً.', missing: 'اختر مدينة وتاريخاً صالحاً أولاً.', copy: 'نسخ رابط API', copied: 'تم النسخ', raw: 'فتح JSON', useLocation: 'استخدم موقعي', locating: 'جارٍ تحديد موقعك...', locationError: 'تعذر تحديد أقرب مدينة. تأكد من السماح للموقع ثم حاول مجدداً.', share: 'مشاركة كصورة', sharing: 'جاري تجهيز الصورة...', copyTimes: 'نسخ المواقيت', timesCopied: 'تم نسخ المواقيت', prayerTimesFor: 'مواقيت الصلاة في', weekTitle: 'مواقيت 7 أيام', weekSub: 'من التاريخ المحدد ولمدة أسبوع كامل', weekLoading: 'جاري تحميل الأسبوع...', weekError: 'تعذر تحميل مواقيت الأسبوع.', gregorian: 'ميلادي', hijri: 'هجري',
     stats: [['19', 'محافظة عراقية'], ['121', 'مدينة وناحية'], ['44,165', 'سجل موثّق'], ['100', 'طلب في الدقيقة']],
     whyEyebrow: 'مصمّمة للوضوح والاعتمادية', whyTitle: 'كل ما تحتاجه، بدون تعقيد', whyLead: 'واجهة واحدة تخدم المستخدم العادي وتمنح المطور بيانات منظمة يمكن دمجها خلال دقائق.',
     features: [['بحث مرن', 'ابحث باسم المدينة العربي أو الإنجليزي أو استخدم المعرّف البرمجي مباشرة.'], ['استجابة موحّدة', 'صيغة JSON ثابتة وواضحة لليوم أو الشهر أو السنة الكاملة.'], ['حماية واستقرار', 'تحديد ذكي لمعدل الطلبات مع ترويسات أمان وCORS مفتوح.'], ['توقيت صحيح', 'كل التواريخ والأوقات مضبوطة على منطقة Asia/Baghdad.'], ['توثيق تفاعلي', 'أمثلة جاهزة وSwagger ومختبر كامل لتجربة كل نقطة اتصال.'], ['بيانات مدققة', 'فحوص للصيغة والتسلسل والاكتمال قبل نشر كل نسخة بيانات.']],
@@ -47,7 +52,7 @@ export default function HomePage() {
     try: 'Try the query', docs: 'Read the docs', free: 'Completely free', noAccount: 'No account needed', timezone: 'Baghdad time',
     queryTitle: 'Find prayer times', querySub: 'Choose a place and date to get an instant result.', gov: 'Governorate', city: 'City', date: 'Date',
     selectGov: 'Select governorate', selectCity: 'Select city', loadingCities: 'Loading cities...', search: 'Show prayer times', searching: 'Running query...',
-    error: 'We could not load the data. Check your selections and try again.', missing: 'Select a city and a valid date first.', copy: 'Copy API URL', copied: 'Copied', raw: 'Open JSON', useLocation: 'Use my location', locating: 'Locating...', locationError: 'Could not find the nearest city. Allow location access and try again.', share: 'Share as story image', sharing: 'Preparing image...', copyTimes: 'Copy prayer times', timesCopied: 'Prayer times copied', prayerTimesFor: 'Prayer times for',
+    error: 'We could not load the data. Check your selections and try again.', missing: 'Select a city and a valid date first.', copy: 'Copy API URL', copied: 'Copied', raw: 'Open JSON', useLocation: 'Use my location', locating: 'Locating...', locationError: 'Could not find the nearest city. Allow location access and try again.', share: 'Share as story image', sharing: 'Preparing image...', copyTimes: 'Copy prayer times', timesCopied: 'Prayer times copied', prayerTimesFor: 'Prayer times for', weekTitle: '7-day prayer times', weekSub: 'Starting from the selected date', weekLoading: 'Loading week...', weekError: 'Could not load weekly prayer times.', gregorian: 'Gregorian', hijri: 'Hijri',
     stats: [['19', 'Governorates'], ['121', 'Cities & districts'], ['44,165', 'Verified records'], ['100', 'Requests per minute']],
     whyEyebrow: 'Built for clarity and reliability', whyTitle: 'Everything you need, without the friction', whyLead: 'One interface works for everyday visitors and gives developers structured data they can integrate in minutes.',
     features: [['Flexible search', 'Find a city by its Arabic or English name, or use its developer-friendly slug.'], ['Consistent responses', 'Stable JSON for a single day, full month, or an entire year.'], ['Safe and reliable', 'Smart rate limiting, security headers, and open CORS support.'], ['Correct timezone', 'All dates and times are aligned to the Asia/Baghdad timezone.'], ['Interactive docs', 'Ready examples, Swagger, and a complete playground for every endpoint.'], ['Validated data', 'Format, chronology, completeness, and duplicate checks before release.']],
@@ -94,6 +99,23 @@ export default function HomePage() {
       .finally(() => setLoadingCities(false))
   }, [governorate, isArabic])
 
+  async function loadWeek(selectedCity: string, selectedDate: string) {
+    if (!selectedCity || !selectedDate) return
+    setLoadingWeek(true)
+    setWeekError('')
+    setWeekResult(null)
+    try {
+      const response = await fetch(`/api/v1/prayer-times/week?city=${encodeURIComponent(selectedCity)}&date=${selectedDate}`, { cache: 'no-store' })
+      const body = await response.json()
+      if (!response.ok || !body.success) throw new Error()
+      setWeekResult(body.data)
+    } catch {
+      setWeekError(text.weekError)
+    } finally {
+      setLoadingWeek(false)
+    }
+  }
+
   async function submitQuery(event: React.FormEvent) {
     event.preventDefault(); setError(''); setResult(null)
     if (!city || !date) return setError(text.missing)
@@ -102,6 +124,7 @@ export default function HomePage() {
       const response = await fetch(apiUrl); const body = await response.json()
       if (!response.ok || !body.success) throw new Error()
       setResult(body.data)
+      void loadWeek(city, date)
     } catch { setError(text.error) } finally { setLoading(false) }
   }
 
@@ -126,6 +149,21 @@ export default function HomePage() {
   }
 
 
+
+  function formatWeekDay(value: string) {
+    const parsed = new Date(`${value}T00:00:00`)
+    return parsed.toLocaleDateString(isArabic ? 'ar-IQ' : 'en-GB', { weekday: 'short' })
+  }
+
+  function formatShortGregorian(value: string) {
+    const parsed = new Date(`${value}T00:00:00`)
+    return parsed.toLocaleDateString(isArabic ? 'ar-IQ' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  function formatShortHijri(value: string) {
+    const parsed = new Date(`${value}T00:00:00`)
+    return new Intl.DateTimeFormat(isArabic ? 'ar-IQ-u-ca-islamic-umalqura' : 'en-u-ca-islamic-umalqura', { day: 'numeric', month: 'short', year: 'numeric' }).format(parsed)
+  }
 
   function getShareTimeParts(value: string) {
     const match = value.trim().match(/^(\d{1,2}):(\d{2})/)
@@ -198,8 +236,8 @@ ${window.location.origin}`
     if (!ctx) throw new Error('Canvas is not supported')
 
     try {
-      await document.fonts.load('700 60px "IBM Plex Sans Arabic"')
-      await document.fonts.load('500 32px "IBM Plex Sans Arabic"')
+      await document.fonts.load('700 64px "IBM Plex Sans Arabic"')
+      await document.fonts.load('500 30px "IBM Plex Sans Arabic"')
     } catch {}
 
     const fontFamily = '"IBM Plex Sans Arabic", Arial, sans-serif'
@@ -210,128 +248,74 @@ ${window.location.origin}`
 
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920)
     bg.addColorStop(0, '#edf7f4')
-    bg.addColorStop(.52, '#fbfdfc')
-    bg.addColorStop(1, '#e8f3f0')
+    bg.addColorStop(.58, '#fbfdfc')
+    bg.addColorStop(1, '#e7f2ef')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, 1080, 1920)
 
-    ctx.globalAlpha = .38
+    ctx.globalAlpha = .28
     ctx.fillStyle = '#c9e8e0'
-    ctx.beginPath(); ctx.arc(955, 125, 235, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = '#f3dfad'
-    ctx.beginPath(); ctx.arc(80, 1790, 190, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.arc(990, 130, 220, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = '#f1ddb1'
+    ctx.beginPath(); ctx.arc(55, 1815, 170, 0, Math.PI * 2); ctx.fill()
     ctx.globalAlpha = 1
 
-    roundedRect(ctx, 390, 74, 300, 72, 36)
+    roundedRect(ctx, 410, 70, 260, 64, 32)
     ctx.fillStyle = '#dff3ee'; ctx.fill()
-    drawCenteredText(ctx, 'IQPR Time', 110, `700 37px ${fontFamily}`, '#073f40')
-    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today', 220, `700 56px ${fontFamily}`, '#0b3334')
+    drawCenteredText(ctx, 'IQPR Time', 102, `700 34px ${fontFamily}`, '#073f40')
+    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today', 205, `700 54px ${fontFamily}`, '#0b3334')
 
-    roundedRect(ctx, 70, 295, 940, 355, 42)
-    ctx.fillStyle = '#ffffff'; ctx.fill()
-    ctx.strokeStyle = '#d3e6e1'; ctx.lineWidth = 3; ctx.stroke()
+    // City is the visual anchor.
+    drawCenteredText(ctx, cityName, 320, `700 72px ${fontFamily}`, '#0a4343')
+    roundedRect(ctx, 415, 366, 250, 56, 28)
+    ctx.fillStyle = '#eef7f4'; ctx.fill()
+    drawCenteredText(ctx, governorateName, 394, `500 27px ${fontFamily}`, '#5b7775')
 
-    const infoRows = isArabic
-      ? [
-          ['المحافظة', governorateName],
-          ['المدينة', cityName],
-          ['الميلادي', gregorianDate],
-          ['الهجري', hijriDate],
-        ]
-      : [
-          ['Governorate', governorateName],
-          ['City', cityName],
-          ['Gregorian', gregorianDate],
-          ['Hijri', hijriDate],
-        ]
-
-    infoRows.forEach(([label, value], index) => {
-      const y = 355 + index * 72
-      ctx.save()
-      ctx.textBaseline = 'middle'
-      if (isArabic) {
-        ctx.direction = 'rtl'
-        ctx.textAlign = 'right'
-        ctx.font = `600 27px ${fontFamily}`
-        ctx.fillStyle = '#78908e'
-        ctx.fillText(label, 925, y)
-        ctx.font = `700 33px ${fontFamily}`
-        ctx.fillStyle = '#123f40'
-        ctx.fillText(value, 755, y)
-      } else {
-        ctx.direction = 'ltr'
-        ctx.textAlign = 'left'
-        ctx.font = `600 27px ${fontFamily}`
-        ctx.fillStyle = '#78908e'
-        ctx.fillText(label, 155, y)
-        ctx.font = `700 33px ${fontFamily}`
-        ctx.fillStyle = '#123f40'
-        ctx.fillText(value, 330, y)
-      }
+    // Balanced Gregorian / Hijri cards.
+    const dateCards = isArabic
+      ? [[text.gregorian, gregorianDate], [text.hijri, hijriDate]]
+      : [[text.gregorian, gregorianDate], [text.hijri, hijriDate]]
+    dateCards.forEach(([label, value], i) => {
+      const x = i === 0 ? 70 : 555
+      roundedRect(ctx, x, 470, 455, 150, 28)
+      ctx.fillStyle = '#ffffff'; ctx.fill()
+      ctx.strokeStyle = '#d9e9e5'; ctx.lineWidth = 2; ctx.stroke()
+      ctx.save(); ctx.direction = isArabic ? 'rtl' : 'ltr'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.font = `600 24px ${fontFamily}`; ctx.fillStyle = '#7b9190'; ctx.fillText(label, x + 227.5, 512)
+      ctx.font = `700 29px ${fontFamily}`; ctx.fillStyle = '#173f40'; ctx.fillText(value, x + 227.5, 565)
       ctx.restore()
-
-      if (index < infoRows.length - 1) {
-        ctx.strokeStyle = '#e7f0ed'
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        ctx.moveTo(120, y + 36)
-        ctx.lineTo(960, y + 36)
-        ctx.stroke()
-      }
     })
 
-    const startY = 715
-    const rowH = 137
+    ctx.strokeStyle = '#dbe9e5'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(120, 680); ctx.lineTo(960, 680); ctx.stroke()
+
+    const startY = 720
+    const rowH = 126
     prayerKeys.forEach((key, index) => {
       const y = startY + index * rowH
-      roundedRect(ctx, 70, y, 940, 108, 26)
+      roundedRect(ctx, 85, y, 910, 94, 24)
       ctx.fillStyle = index % 2 === 0 ? '#ffffff' : '#f5faf8'
       ctx.fill()
-      ctx.strokeStyle = '#dae9e5'
-      ctx.lineWidth = 2
-      ctx.stroke()
+      ctx.strokeStyle = '#ddebe7'; ctx.lineWidth = 2; ctx.stroke()
 
       const prayerName = text.prayer[key as keyof typeof text.prayer]
       const { time, period } = getShareTimeParts(result.prayer_times[key])
-
-      ctx.save()
-      ctx.textBaseline = 'middle'
+      ctx.save(); ctx.textBaseline = 'middle'
       if (isArabic) {
-        ctx.direction = 'rtl'
-        ctx.textAlign = 'right'
-        ctx.font = `700 38px ${fontFamily}`
-        ctx.fillStyle = '#173f40'
-        ctx.fillText(prayerName, 915, y + 54)
-
-        ctx.direction = 'ltr'
-        ctx.textAlign = 'left'
-        ctx.font = `700 33px ${fontFamily}`
-        ctx.fillStyle = '#0d7c75'
-        ctx.fillText(period, 135, y + 54)
-
-        ctx.font = `700 45px ${fontFamily}`
-        ctx.fillText(time, 205, y + 54)
+        ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.font = `700 37px ${fontFamily}`; ctx.fillStyle = '#173f40'; ctx.fillText(prayerName, 905, y + 47)
+        ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.font = `700 31px ${fontFamily}`; ctx.fillStyle = '#0d7c75'; ctx.fillText(period, 145, y + 47)
+        ctx.font = `700 43px ${fontFamily}`; ctx.fillText(time, 205, y + 47)
       } else {
-        ctx.direction = 'ltr'
-        ctx.textAlign = 'left'
-        ctx.font = `700 38px ${fontFamily}`
-        ctx.fillStyle = '#173f40'
-        ctx.fillText(prayerName, 135, y + 54)
-
-        ctx.textAlign = 'right'
-        ctx.font = `700 45px ${fontFamily}`
-        ctx.fillStyle = '#0d7c75'
-        ctx.fillText(`${time} ${period}`, 915, y + 54)
+        ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.font = `700 37px ${fontFamily}`; ctx.fillStyle = '#173f40'; ctx.fillText(prayerName, 145, y + 47)
+        ctx.textAlign = 'right'; ctx.font = `700 43px ${fontFamily}`; ctx.fillStyle = '#0d7c75'; ctx.fillText(`${time} ${period}`, 905, y + 47)
       }
       ctx.restore()
     })
 
-    roundedRect(ctx, 260, 1605, 560, 84, 42)
-    ctx.fillStyle = '#0d7c75'
-    ctx.fill()
-    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1647, `700 28px ${fontFamily}`, '#ffffff')
-
-    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1760, `600 31px ${fontFamily}`, '#476e6b')
+    roundedRect(ctx, 330, 1550, 420, 66, 33)
+    ctx.fillStyle = '#0d7c75'; ctx.fill()
+    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1583, `600 25px ${fontFamily}`, '#ffffff')
+    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1692, `500 28px ${fontFamily}`, '#547270')
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create image')), 'image/png', 1)
@@ -408,7 +392,26 @@ ${window.location.origin}`
           <div className="field"><label htmlFor="home-governorate">{text.gov}</label><div className="input-wrap"><MapPin className="input-icon" size={17} /><select id="home-governorate" className="form-control" value={governorate} onChange={e => { setGovernorate(e.target.value); setResult(null) }}><option value="">{text.selectGov}</option>{governorates.map(item => <option key={item.id} value={item.slug}>{isArabic ? item.name_ar : item.name_en}</option>)}</select></div></div>
           <div className="field"><label htmlFor="home-city">{text.city}</label><div className="input-wrap"><ChevronDown className="input-icon" size={17} /><select id="home-city" className="form-control" value={city} disabled={loadingCities || !cities.length} onChange={e => { setCity(e.target.value); setResult(null) }}><option value="">{loadingCities ? text.loadingCities : text.selectCity}</option>{cities.map(item => <option key={item.id} value={item.slug}>{isArabic ? item.name_ar : item.name_en}</option>)}</select></div></div>
         </div><div className="field"><label htmlFor="home-date">{text.date}</label><div className="date-picker-wrap"><div className="date-display" aria-hidden="true"><CalendarDays size={17} /><span>{date ? new Date(`${date}T00:00:00`).toLocaleDateString(isArabic ? 'ar-IQ' : 'en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }) : text.date}</span></div><input id="home-date" type="date" className="date-native-input" value={date} onChange={e => { setDate(e.target.value); setResult(null) }} min="2026-01-01" max="2026-12-31" aria-label={text.date} /></div></div>{error && <div className="query-error"><ShieldCheck size={16} /> {error}</div>}<button className="btn btn-primary btn-lg w-full" disabled={loading || loadingCities}>{loading ? <LoaderCircle className="spin" size={19} /> : <Search size={19} />}{loading ? text.searching : text.search}</button></form>
-        {result && <div className="result-panel"><div className="result-context"><div className="result-context-icon"><MapPin size={19} /></div><div><span>{text.prayerTimesFor}</span><strong>{isArabic ? result.city.name_ar : result.city.name_en}</strong><small>{isArabic ? result.city.governorate.name_ar : result.city.governorate.name_en} · {formatResultDate(result.date)}</small></div></div><div className="prayer-grid">{prayerKeys.map((key, index) => { const Icon = prayerIcons[index]; return <div className="prayer-item" key={key}><Icon size={17} /><span>{text.prayer[key as keyof typeof text.prayer]}</span><strong>{result.prayer_times[key]}</strong></div> })}</div><div className="result-actions primary-actions"><button type="button" className="btn btn-primary btn-sm" onClick={sharePrayerTimes} disabled={sharingStory}>{sharingStory ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />} {sharingStory ? text.sharing : text.share}</button><button type="button" className="btn btn-secondary btn-sm" onClick={copyPrayerTimes}>{resultCopied ? <Check size={15} /> : <Copy size={15} />}{resultCopied ? text.timesCopied : text.copyTimes}</button></div><div className="result-actions secondary-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={copyApiUrl}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? text.copied : text.copy}</button><a className="btn btn-ghost btn-sm" href={apiUrl} target="_blank" rel="noreferrer"><Braces size={15} /> {text.raw}</a></div></div>}
+        {result && <div className="result-panel">
+          <div className="result-context result-context-premium">
+            <div className="result-context-icon"><MapPin size={19} /></div>
+            <div className="result-place"><span>{isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today'}</span><strong>{isArabic ? result.city.name_ar : result.city.name_en}</strong><small>{isArabic ? result.city.governorate.name_ar : result.city.governorate.name_en}</small></div>
+            <div className="result-date-pair"><span><b>{text.gregorian}</b>{formatResultDate(result.date)}</span><span><b>{text.hijri}</b>{formatHijriDate(result.date)}</span></div>
+          </div>
+          <div className="prayer-grid">{prayerKeys.map((key, index) => { const Icon = prayerIcons[index]; return <div className="prayer-item" key={key}><Icon size={17} /><span>{text.prayer[key as keyof typeof text.prayer]}</span><strong>{formatShareTime(result.prayer_times[key])}</strong></div> })}</div>
+          <div className="result-actions primary-actions"><button type="button" className="btn btn-primary btn-sm" onClick={sharePrayerTimes} disabled={sharingStory}>{sharingStory ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />} {sharingStory ? text.sharing : text.share}</button><button type="button" className="btn btn-secondary btn-sm" onClick={copyPrayerTimes}>{resultCopied ? <Check size={15} /> : <Copy size={15} />}{resultCopied ? text.timesCopied : text.copyTimes}</button></div>
+          <div className="result-actions secondary-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={copyApiUrl}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? text.copied : text.copy}</button><a className="btn btn-ghost btn-sm" href={apiUrl} target="_blank" rel="noreferrer"><Braces size={15} /> {text.raw}</a></div>
+
+          <section className="week-panel" aria-labelledby="week-title">
+            <div className="week-head"><div className="week-head-icon"><CalendarRange size={20} /></div><div><h3 id="week-title">{text.weekTitle}</h3><p>{text.weekSub}</p></div>{weekResult && <span className="week-range">{formatShortGregorian(weekResult.start_date)} — {formatShortGregorian(weekResult.end_date)}</span>}</div>
+            {loadingWeek && <div className="week-state"><LoaderCircle className="spin" size={18} /> {text.weekLoading}</div>}
+            {weekError && !loadingWeek && <div className="week-state week-state-error"><ShieldCheck size={17} /> {weekError}<button type="button" className="btn btn-ghost btn-sm" onClick={() => loadWeek(city, date)}>{isArabic ? 'إعادة المحاولة' : 'Retry'}</button></div>}
+            {weekResult && !loadingWeek && <>
+              <div className="week-table-wrap"><table className="week-table"><thead><tr><th>{text.date}</th>{prayerKeys.map(key => <th key={key}>{text.prayer[key as keyof typeof text.prayer]}</th>)}</tr></thead><tbody>{weekResult.days.map(day => <tr key={day.date}><td><strong>{formatWeekDay(day.date)}</strong><span>{formatShortGregorian(day.date)}</span><small>{formatShortHijri(day.date)}</small></td>{prayerKeys.map(key => <td key={key}>{formatShareTime(day[key as keyof WeekDay] as string)}</td>)}</tr>)}</tbody></table></div>
+              <div className="week-cards">{weekResult.days.map(day => <article className="week-day-card" key={day.date}><header><div><strong>{formatWeekDay(day.date)}</strong><span>{formatShortGregorian(day.date)}</span></div><small>{formatShortHijri(day.date)}</small></header><div className="week-day-times">{prayerKeys.map(key => <div key={key}><span>{text.prayer[key as keyof typeof text.prayer]}</span><b>{formatShareTime(day[key as keyof WeekDay] as string)}</b></div>)}</div></article>)}</div>
+            </>}
+          </section>
+        </div>}
       </div></div>
     </div></section>
     <section className="section section-soft"><div className="container stats-grid">{text.stats.map(([number, label]) => <div className="card stat" key={label}><strong>{number}</strong><span>{label}</span></div>)}</div></section>
