@@ -117,11 +117,22 @@ export default function HomePage() {
     })
   }
 
+
+  function formatShareTime(value: string) {
+    const match = value.trim().match(/^(\d{1,2}):(\d{2})/)
+    if (!match) return value
+    let hour = Number(match[1])
+    const minute = match[2]
+    const period = hour >= 12 ? (isArabic ? 'م' : 'PM') : (isArabic ? 'ص' : 'AM')
+    hour = hour % 12 || 12
+    return `${hour}:${minute} ${period}`
+  }
+
   function buildShareText() {
     if (!result) return ''
     const cityName = isArabic ? result.city.name_ar : result.city.name_en
     const governorateName = isArabic ? result.city.governorate.name_ar : result.city.governorate.name_en
-    const lines = prayerKeys.map(key => `${text.prayer[key as keyof typeof text.prayer]}: ${result.prayer_times[key]}`)
+    const lines = prayerKeys.map(key => `${text.prayer[key as keyof typeof text.prayer]}: ${formatShareTime(result.prayer_times[key])}`)
     return `${text.prayerTimesFor} ${cityName} - ${governorateName}
 ${formatResultDate(result.date)}
 
@@ -224,7 +235,7 @@ ${window.location.origin}`
         ctx.textAlign = 'left'
         ctx.font = '700 44px Arial, sans-serif'
         ctx.fillStyle = '#0d7c75'
-        ctx.fillText(result.prayer_times[key], 185, y + 56)
+        ctx.fillText(formatShareTime(result.prayer_times[key]), 185, y + 56)
       } else {
         ctx.direction = 'ltr'
         ctx.textAlign = 'left'
@@ -234,7 +245,7 @@ ${window.location.origin}`
         ctx.textAlign = 'right'
         ctx.font = '700 44px Arial, sans-serif'
         ctx.fillStyle = '#0d7c75'
-        ctx.fillText(result.prayer_times[key], 895, y + 56)
+        ctx.fillText(formatShareTime(result.prayer_times[key]), 895, y + 56)
       }
       ctx.restore()
     })
