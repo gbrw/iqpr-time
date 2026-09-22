@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlarmClock, ArrowLeft, ArrowRight, Braces, CalendarDays, CalendarRange, Check, CheckCircle2, ChevronDown, CloudSun, Code2, Copy, Database, Globe2, LoaderCircle, LocateFixed, MapPin, MoonStar, Search, Share2, ShieldCheck, Sparkles, Sun, Sunrise, Sunset, Table2, TerminalSquare, Zap } from 'lucide-react'
 import { useLanguage } from '@/components/site/LanguageProvider'
 
@@ -23,6 +23,8 @@ export default function HomePage() {
   const [governorate, setGovernorate] = useState('baghdad')
   const [city, setCity] = useState('baghdad-center')
   const [date, setDate] = useState(todayInBaghdad)
+  const pendingLocationCityRef = useRef<string | null>(null)
+  const [locationSelectionVersion, setLocationSelectionVersion] = useState(0)
   const [loadingCities, setLoadingCities] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -43,7 +45,7 @@ export default function HomePage() {
     try: 'جرّب الاستعلام', docs: 'اقرأ التوثيق', free: 'مجانية بالكامل', noAccount: 'لا تحتاج حساباً', timezone: 'بتوقيت بغداد',
     queryTitle: 'اعرف مواقيت مدينتك', querySub: 'اختر المكان والتاريخ لتحصل على النتيجة فوراً.', gov: 'المحافظة', city: 'المدينة', date: 'التاريخ',
     selectGov: 'اختر المحافظة', selectCity: 'اختر المدينة', loadingCities: 'جاري تحميل المدن...', search: 'عرض المواقيت', searching: 'جاري الاستعلام...',
-    error: 'تعذر جلب البيانات. تحقق من اختياراتك وحاول مجدداً.', missing: 'اختر مدينة وتاريخاً صالحاً أولاً.', copy: 'نسخ رابط API', copied: 'تم النسخ', raw: 'فتح JSON', useLocation: 'استخدم موقعي', locating: 'جارٍ تحديد موقعك...', locationError: 'تعذر تحديد أقرب مدينة. تأكد من السماح للموقع ثم حاول مجدداً.', share: 'مشاركة كصورة', sharing: 'جاري تجهيز الصورة...', copyTimes: 'نسخ المواقيت', timesCopied: 'تم نسخ المواقيت', prayerTimesFor: 'مواقيت الصلاة في', weekTitle: 'مواقيت 7 أيام', weekSub: 'من التاريخ المحدد ولمدة أسبوع كامل', weekLoading: 'جاري تحميل الأسبوع...', weekError: 'تعذر تحميل مواقيت الأسبوع.', gregorian: 'ميلادي', hijri: 'هجري', weekShare: 'مشاركة الأسبوع كصورة', weekSave: 'حفظ صورة الأسبوع', weekPreparing: 'جاري تجهيز صورة الأسبوع...',
+    error: 'تعذر جلب البيانات. تحقق من اختياراتك وحاول مجدداً.', missing: 'اختر مدينة وتاريخاً صالحاً أولاً.', copy: 'نسخ رابط API', copied: 'تم النسخ', raw: 'فتح JSON', useLocation: 'استخدم موقعي', locating: 'جارٍ تحديد موقعك...', locationError: 'تعذر تحديد أقرب مدينة. تأكد من السماح للموقع ثم حاول مجدداً.', share: 'مشاركة كصورة', sharing: 'جاري تجهيز الصورة...', copyTimes: 'نسخ المواقيت', timesCopied: 'تم نسخ المواقيت', prayerTimesFor: 'مواقيت الصلاة في', weekTitle: 'مواقيت الصلاة لهذا الأسبوع', weekSub: 'من الأحد إلى السبت', weekLoading: 'جاري تحميل الأسبوع...', weekError: 'تعذر تحميل مواقيت الأسبوع.', gregorian: 'ميلادي', hijri: 'هجري', weekShare: 'مشاركة الأسبوع كصورة', weekSave: 'حفظ صورة الأسبوع', weekPreparing: 'جاري تجهيز صورة الأسبوع...',
     stats: [['19', 'محافظة عراقية'], ['121', 'مدينة وناحية'], ['44,165', 'سجل موثّق'], ['100', 'طلب في الدقيقة']],
     whyEyebrow: 'مصمّمة للوضوح والاعتمادية', whyTitle: 'كل ما تحتاجه، بدون تعقيد', whyLead: 'واجهة واحدة تخدم المستخدم العادي وتمنح المطور بيانات منظمة يمكن دمجها خلال دقائق.',
     features: [['بحث مرن', 'ابحث باسم المدينة العربي أو الإنجليزي أو استخدم المعرّف البرمجي مباشرة.'], ['استجابة موحّدة', 'صيغة JSON ثابتة وواضحة لليوم أو الشهر أو السنة الكاملة.'], ['حماية واستقرار', 'تحديد ذكي لمعدل الطلبات مع ترويسات أمان وCORS مفتوح.'], ['توقيت صحيح', 'كل التواريخ والأوقات مضبوطة على منطقة Asia/Baghdad.'], ['توثيق تفاعلي', 'أمثلة جاهزة وSwagger ومختبر كامل لتجربة كل نقطة اتصال.'], ['بيانات مدققة', 'فحوص للصيغة والتسلسل والاكتمال قبل نشر كل نسخة بيانات.']],
@@ -55,7 +57,7 @@ export default function HomePage() {
     try: 'Try the query', docs: 'Read the docs', free: 'Completely free', noAccount: 'No account needed', timezone: 'Baghdad time',
     queryTitle: 'Find prayer times', querySub: 'Choose a place and date to get an instant result.', gov: 'Governorate', city: 'City', date: 'Date',
     selectGov: 'Select governorate', selectCity: 'Select city', loadingCities: 'Loading cities...', search: 'Show prayer times', searching: 'Running query...',
-    error: 'We could not load the data. Check your selections and try again.', missing: 'Select a city and a valid date first.', copy: 'Copy API URL', copied: 'Copied', raw: 'Open JSON', useLocation: 'Use my location', locating: 'Locating...', locationError: 'Could not find the nearest city. Allow location access and try again.', share: 'Share as story image', sharing: 'Preparing image...', copyTimes: 'Copy prayer times', timesCopied: 'Prayer times copied', prayerTimesFor: 'Prayer times for', weekTitle: '7-day prayer times', weekSub: 'Starting from the selected date', weekLoading: 'Loading week...', weekError: 'Could not load weekly prayer times.', gregorian: 'Gregorian', hijri: 'Hijri', weekShare: 'Share week as image', weekSave: 'Save weekly image', weekPreparing: 'Preparing weekly image...',
+    error: 'We could not load the data. Check your selections and try again.', missing: 'Select a city and a valid date first.', copy: 'Copy API URL', copied: 'Copied', raw: 'Open JSON', useLocation: 'Use my location', locating: 'Locating...', locationError: 'Could not find the nearest city. Allow location access and try again.', share: 'Share as story image', sharing: 'Preparing image...', copyTimes: 'Copy prayer times', timesCopied: 'Prayer times copied', prayerTimesFor: 'Prayer times for', weekTitle: 'Prayer times for this week', weekSub: 'Sunday through Saturday', weekLoading: 'Loading week...', weekError: 'Could not load weekly prayer times.', gregorian: 'Gregorian', hijri: 'Hijri', weekShare: 'Share week as image', weekSave: 'Save weekly image', weekPreparing: 'Preparing weekly image...',
     stats: [['19', 'Governorates'], ['121', 'Cities & districts'], ['44,165', 'Verified records'], ['100', 'Requests per minute']],
     whyEyebrow: 'Built for clarity and reliability', whyTitle: 'Everything you need, without the friction', whyLead: 'One interface works for everyday visitors and gives developers structured data they can integrate in minutes.',
     features: [['Flexible search', 'Find a city by its Arabic or English name, or use its developer-friendly slug.'], ['Consistent responses', 'Stable JSON for a single day, full month, or an entire year.'], ['Safe and reliable', 'Smart rate limiting, security headers, and open CORS support.'], ['Correct timezone', 'All dates and times are aligned to the Asia/Baghdad timezone.'], ['Interactive docs', 'Ready examples, Swagger, and a complete playground for every endpoint.'], ['Validated data', 'Format, chronology, completeness, and duplicate checks before release.']],
@@ -108,7 +110,19 @@ export default function HomePage() {
       .then(body => {
         const nextCities: City[] = Array.isArray(body?.data?.cities) ? body.data.cities : []
         setCities(nextCities)
-        setCity(current => nextCities.some(item => item.slug === current) ? current : (nextCities[0]?.slug ?? ''))
+
+        const requestedCity = pendingLocationCityRef.current
+        if (requestedCity && nextCities.some(item => item.slug === requestedCity)) {
+          setCity(requestedCity)
+          pendingLocationCityRef.current = null
+          return
+        }
+
+        setCity(current =>
+          nextCities.some(item => item.slug === current)
+            ? current
+            : (nextCities[0]?.slug ?? '')
+        )
       })
       .catch(err => {
         console.error('[home/cities]', { governorate: normalizedGovernorate, error: err })
@@ -117,7 +131,7 @@ export default function HomePage() {
         setError(isArabic ? 'تعذر تحميل المدن.' : 'Could not load cities.')
       })
       .finally(() => setLoadingCities(false))
-  }, [governorate, isArabic])
+  }, [governorate, isArabic, locationSelectionVersion])
 
   useEffect(() => {
     let cancelled = false
@@ -480,7 +494,7 @@ ${window.location.origin}`
     roundedRect(ctx, 390, 58, 300, 66, 33)
     ctx.fillStyle = '#dcefeb'; ctx.fill()
     drawCenteredText(ctx, 'IQPR Time', 91, `700 34px ${fontFamily}`, '#073f40')
-    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة للأيام السبعة' : '7-day prayer times', 170, `700 46px ${fontFamily}`, '#0b3334')
+    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا الأسبوع' : 'Prayer times for this week', 170, `700 46px ${fontFamily}`, '#0b3334')
     drawCenteredText(ctx, `${cityName} · ${governorateName}`, 226, `700 31px ${fontFamily}`, '#0d746e')
 
     // Range summary board
@@ -503,7 +517,7 @@ ${window.location.origin}`
     )
 
     // Column headers once
-    const colXs = [180, 324, 468, 612, 756, 900]
+    const colXs = isArabic ? [900, 756, 612, 468, 324, 180] : [180, 324, 468, 612, 756, 900]
     roundedRect(ctx, 58, 420, 964, 72, 18)
     ctx.fillStyle = '#0d7c75'; ctx.fill()
     prayerKeys.forEach((key, i) => {
@@ -592,7 +606,7 @@ ${window.location.origin}`
     try {
       const blob = await createWeeklyImageBlob()
       const file = new File([blob], `iqpr-${weekResult.city.slug}-${weekResult.start_date}-7days.png`, { type: 'image/png' })
-      const title = isArabic ? `مواقيت الصلاة للأيام السبعة - ${weekResult.city.name_ar}` : `7-day prayer times - ${weekResult.city.name_en}`
+      const title = isArabic ? `مواقيت الصلاة لهذا الأسبوع - ${weekResult.city.name_ar}` : `Prayer times for this week - ${weekResult.city.name_en}`
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title, text: title })
@@ -671,8 +685,13 @@ ${window.location.origin}`
         if (!response.ok || !body.success || !body.data?.city) throw new Error()
         const nextGovernorate = body.data.city.governorate_slug
         const nextCity = body.data.city.slug
+
+        // Keep governorate + city as one logical selection.  The city list is
+        // reloaded for the detected governorate first, then the detected city
+        // is applied only if it belongs to that list.
+        pendingLocationCityRef.current = nextCity
         setGovernorate(nextGovernorate)
-        setCity(nextCity)
+        setLocationSelectionVersion(version => version + 1)
         setResult(null)
       } catch {
         setError(text.locationError)
