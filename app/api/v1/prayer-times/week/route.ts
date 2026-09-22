@@ -5,6 +5,15 @@ import { successResponse, errorResponse } from '@/lib/api/response'
 import { ErrorCodes, ErrorMessages } from '@/lib/api/errors'
 import { CityIdentifierSchema, parseDateParam } from '@/lib/validation/schemas'
 
+
+function startOfSundayWeek(date: string) {
+  const [year, month, day] = date.split('-').map(Number)
+  const value = new Date(Date.UTC(year, month - 1, day))
+  const dayOfWeek = value.getUTCDay() // Sunday = 0 ... Saturday = 6
+  value.setUTCDate(value.getUTCDate() - dayOfWeek)
+  return value.toISOString().slice(0, 10)
+}
+
 function addDays(date: string, days: number) {
   const [year, month, day] = date.split('-').map(Number)
   const value = new Date(Date.UTC(year, month - 1, day + days))
@@ -33,7 +42,8 @@ export async function GET(request: NextRequest) {
   if (!startDate) {
     return errorResponse(ErrorCodes.INVALID_DATE, ErrorMessages.INVALID_DATE, 400)
   }
-  const endDate = addDays(startDate, 6)
+  const weekStart = startOfSundayWeek(startDate)
+  const endDate = addDays(weekStart, 6)
 
   try {
     const city = await findCity(cityResult.data)
@@ -41,7 +51,7 @@ export async function GET(request: NextRequest) {
       return errorResponse(ErrorCodes.CITY_NOT_FOUND, ErrorMessages.CITY_NOT_FOUND, 404)
     }
 
-    const days = await getPrayerTimesForRange(city.id, startDate, endDate)
+    const days = await getPrayerTimesForRange(city.id, weekStart, endDate)
     if (!days.length) {
       return errorResponse(
         ErrorCodes.PRAYER_TIMES_NOT_FOUND,
@@ -62,7 +72,7 @@ export async function GET(request: NextRequest) {
           slug: city.governorate_slug,
         },
       },
-      start_date: startDate,
+      start_date: weekStart,
       end_date: endDate,
       count: days.length,
       days,
