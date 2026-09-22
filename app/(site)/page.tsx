@@ -114,6 +114,11 @@ export default function HomePage() {
   }, [isArabic])
 
   useEffect(() => {
+    // Do not request the default governorate before localStorage has been restored.
+    // This prevents an older Baghdad request from arriving late and overwriting
+    // a saved city from another governorate.
+    if (!storageHydrated) return
+
     const normalizedGovernorate = governorate.trim().toLowerCase()
     if (!normalizedGovernorate) {
       setCities([])
@@ -121,10 +126,15 @@ export default function HomePage() {
       return
     }
 
+    const controller = new AbortController()
+
     setLoadingCities(true)
     setError('')
 
-    fetch(`/api/v1/cities?governorate=${encodeURIComponent(normalizedGovernorate)}`, { cache: 'no-store' })
+    fetch(
+      `/api/v1/cities?governorate=${encodeURIComponent(normalizedGovernorate)}`,
+      { cache: 'no-store', signal: controller.signal }
+    )
       .then(async r => {
         const body = await r.json()
         if (!r.ok || !body.success) {
@@ -133,14 +143,23 @@ export default function HomePage() {
         return body
       })
       .then(body => {
+        if (controller.signal.aborted) return
+
         const nextCities: City[] = Array.isArray(body?.data?.cities) ? body.data.cities : []
         setCities(nextCities)
 
         const requestedCity = pendingLocationCityRef.current
-        if (requestedCity && nextCities.some(item => item.slug === requestedCity)) {
-          setCity(requestedCity)
+        if (requestedCity) {
+          const savedCityExists = nextCities.some(item => item.slug === requestedCity)
+
+          // Clear the pending value after this governorate has been resolved,
+          // whether the saved city is valid or not.
           pendingLocationCityRef.current = null
-          return
+
+          if (savedCityExists) {
+            setCity(requestedCity)
+            return
+          }
         }
 
         setCity(current =>
@@ -150,13 +169,27 @@ export default function HomePage() {
         )
       })
       .catch(err => {
-        console.error('[home/cities]', { governorate: normalizedGovernorate, error: err })
+        if (controller.signal.aborted || err?.name === 'AbortError') return
+
+        console.error('[home/cities]', {
+          governorate: normalizedGovernorate,
+          error: err,
+        })
+
         setCities([])
         setCity('')
         setError(isArabic ? 'تعذر تحميل المدن.' : 'Could not load cities.')
       })
-      .finally(() => setLoadingCities(false))
-  }, [governorate, isArabic, locationSelectionVersion])
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoadingCities(false)
+        }
+      })
+
+    // Cancel any previous governorate request immediately when the governorate
+    // changes, so a stale response can never replace the current city's list.
+    return () => controller.abort()
+  }, [storageHydrated, governorate, isArabic, locationSelectionVersion])
 
   useEffect(() => {
     let cancelled = false
