@@ -81,6 +81,40 @@ export async function getPrayerTimesForDay(
 }
 
 /**
+ * Get prayer times for an inclusive date range.
+ */
+export async function getPrayerTimesForRange(
+  cityId: number,
+  startDate: string,
+  endDate: string,
+  version?: number
+): Promise<DayPrayerTime[]> {
+  const supabase = getSupabaseClient()
+  const dataVersion = version ?? (await getActiveDataVersion())
+
+  const { data, error } = await supabase
+    .from('prayer_times')
+    .select('prayer_date, fajr, sunrise, dhuhr, asr, maghrib, isha')
+    .eq('city_id', cityId)
+    .eq('data_version', dataVersion)
+    .gte('prayer_date', startDate)
+    .lte('prayer_date', endDate)
+    .order('prayer_date', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map(r => ({
+    date: r.prayer_date,
+    fajr: r.fajr,
+    sunrise: r.sunrise,
+    dhuhr: r.dhuhr,
+    asr: r.asr,
+    maghrib: r.maghrib,
+    isha: r.isha,
+  }))
+}
+
+/**
  * Get prayer times for a month
  */
 export async function getPrayerTimesForMonth(
