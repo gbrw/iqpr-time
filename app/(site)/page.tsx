@@ -728,3 +728,4 @@ ${window.location.origin}`
     <section className="section section-soft"><div className="container developer-panel"><div className="developer-copy"><span className="eyebrow" style={{ color: '#7ed8ca' }}><Braces size={16} /> {text.devEyebrow}</span><h2 className="title-lg">{text.devTitle}</h2><p>{text.devLead}</p><Link href="/docs" className="btn btn-primary">{text.devCta} <Arrow size={17} /></Link></div><div className="developer-code"><div className="code-toolbar"><span>{text.codeLabel}</span><span className="badge">GET</span></div><pre className="code-block"><code>{codeSample}</code></pre></div></div></section>
   </>
 }
+
