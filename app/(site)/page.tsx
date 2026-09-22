@@ -278,129 +278,173 @@ ${window.location.origin}`
     if (!ctx) throw new Error('Canvas is not supported')
 
     try {
-      await document.fonts.load('700 64px "IBM Plex Sans Arabic"')
-      await document.fonts.load('500 30px "IBM Plex Sans Arabic"')
+      await document.fonts.load('700 60px "IBM Plex Sans Arabic"')
+      await document.fonts.load('500 28px "IBM Plex Sans Arabic"')
     } catch {}
 
     const fontFamily = '"IBM Plex Sans Arabic", Arial, sans-serif'
     const cityName = isArabic ? result.city.name_ar : result.city.name_en
     const governorateName = isArabic ? result.city.governorate.name_ar : result.city.governorate.name_en
+    const dateObj = new Date(`${result.date}T00:00:00`)
+    const gregDay = new Intl.DateTimeFormat('en-GB', { day: '2-digit' }).format(dateObj)
+    const gregMonth = new Intl.DateTimeFormat(isArabic ? 'ar-IQ' : 'en-GB', { month: 'long' }).format(dateObj)
+    const gregYear = new Intl.DateTimeFormat('en-GB', { year: 'numeric' }).format(dateObj)
+    const weekDay = new Intl.DateTimeFormat(isArabic ? 'ar-IQ' : 'en-GB', { weekday: 'long' }).format(dateObj)
+
+    const hijriParts = new Intl.DateTimeFormat(
+      isArabic ? 'ar-IQ-u-ca-islamic-umalqura' : 'en-u-ca-islamic-umalqura',
+      { day: 'numeric', month: 'long', year: 'numeric' }
+    ).formatToParts(dateObj)
+    const hijriDay = hijriParts.find(p => p.type === 'day')?.value || ''
+    const hijriMonth = hijriParts.find(p => p.type === 'month')?.value || ''
+    const hijriYear = hijriParts.find(p => p.type === 'year')?.value || ''
+
+    const prayerEn: Record<PrayerKey, string> = {
+      fajr: 'ALFAJR',
+      sunrise: 'SUNRISE',
+      dhuhr: 'DUHUR',
+      asr: 'ALASR',
+      maghrib: 'MAGHRIB',
+      isha: 'ALISHA',
+    }
 
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920)
-    bg.addColorStop(0, '#eff8f5')
+    bg.addColorStop(0, '#eef7f4')
     bg.addColorStop(.55, '#ffffff')
-    bg.addColorStop(1, '#e7f3ef')
+    bg.addColorStop(1, '#e8f2ef')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, 1080, 1920)
 
-    ctx.globalAlpha = .24
-    ctx.fillStyle = '#bfe4dc'
-    ctx.beginPath(); ctx.arc(980, 85, 210, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = '#efdcae'
-    ctx.beginPath(); ctx.arc(30, 1845, 170, 0, Math.PI * 2); ctx.fill()
+    // subtle decorative corners
+    ctx.globalAlpha = .18
+    ctx.fillStyle = '#a9d9cf'
+    ctx.beginPath(); ctx.arc(1030, 80, 220, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = '#efd69b'
+    ctx.beginPath(); ctx.arc(20, 1880, 190, 0, Math.PI * 2); ctx.fill()
     ctx.globalAlpha = 1
 
-    roundedRect(ctx, 398, 72, 284, 66, 33)
-    ctx.fillStyle = '#ddf2ed'; ctx.fill()
-    drawCenteredText(ctx, 'IQPR Time', 105, `700 35px ${fontFamily}`, '#073f40')
-    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today', 202, `700 52px ${fontFamily}`, '#0b3334')
+    // Brand
+    roundedRect(ctx, 390, 64, 300, 70, 35)
+    ctx.fillStyle = '#dcefeb'; ctx.fill()
+    drawCenteredText(ctx, 'IQPR Time', 99, `700 36px ${fontFamily}`, '#073f40')
+    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today', 190, `700 50px ${fontFamily}`, '#0b3334')
+    drawCenteredText(ctx, `${cityName} · ${governorateName}`, 250, `700 33px ${fontFamily}`, '#0d746e')
 
-    // Information card: clear labels, city/place and both dates.
-    roundedRect(ctx, 72, 280, 936, 390, 34)
+    // Date board inspired by mosque display screens
+    roundedRect(ctx, 66, 315, 948, 270, 30)
     ctx.fillStyle = '#ffffff'; ctx.fill()
-    ctx.strokeStyle = '#d5e7e2'; ctx.lineWidth = 2; ctx.stroke()
+    ctx.strokeStyle = '#d4e5e1'; ctx.lineWidth = 3; ctx.stroke()
 
-    const info = isArabic
-      ? [
-          ['المحافظة', governorateName],
-          ['المدينة', cityName],
-          ['التاريخ الميلادي', formatResultDate(result.date)],
-          ['التاريخ الهجري', formatHijriDate(result.date)],
-        ]
-      : [
-          ['Governorate', governorateName],
-          ['City', cityName],
-          ['Gregorian date', formatResultDate(result.date)],
-          ['Hijri date', formatHijriDate(result.date)],
-        ]
+    // separators
+    ctx.strokeStyle = '#e3ece9'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(360, 345); ctx.lineTo(360, 555); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(720, 345); ctx.lineTo(720, 555); ctx.stroke()
 
-    info.forEach(([label, value], i) => {
-      const y = 340 + i * 84
-      ctx.save()
-      ctx.textBaseline = 'middle'
-      if (isArabic) {
-        ctx.direction = 'rtl'
-        ctx.textAlign = 'right'
-        ctx.font = `600 27px ${fontFamily}`
-        ctx.fillStyle = '#6e8784'
-        ctx.fillText(label, 930, y)
-        ctx.font = `700 ${i === 1 ? 40 : 31}px ${fontFamily}`
-        ctx.fillStyle = i === 1 ? '#0a4a48' : '#173f40'
-        ctx.fillText(value, 710, y)
-      } else {
-        ctx.direction = 'ltr'
-        ctx.textAlign = 'left'
-        ctx.font = `600 27px ${fontFamily}`
-        ctx.fillStyle = '#6e8784'
-        ctx.fillText(label, 150, y)
-        ctx.font = `700 ${i === 1 ? 40 : 31}px ${fontFamily}`
-        ctx.fillStyle = i === 1 ? '#0a4a48' : '#173f40'
-        ctx.fillText(value, 370, y)
-      }
-      ctx.restore()
-      if (i < info.length - 1) {
-        ctx.strokeStyle = '#e7f0ed'; ctx.lineWidth = 2
-        ctx.beginPath(); ctx.moveTo(118, y + 42); ctx.lineTo(962, y + 42); ctx.stroke()
-      }
-    })
+    // Gregorian block
+    ctx.save()
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.direction = isArabic ? 'rtl' : 'ltr'
+    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = '#718986'
+    ctx.fillText(isArabic ? 'التاريخ الميلادي' : 'Gregorian', 213, 365)
+    ctx.font = `700 66px ${fontFamily}`; ctx.fillStyle = '#0d7c75'
+    ctx.fillText(gregDay, 213, 438)
+    ctx.font = `600 27px ${fontFamily}`; ctx.fillStyle = '#163f40'
+    ctx.fillText(`${gregMonth} ${gregYear}`, 213, 505)
+    ctx.restore()
 
-    const startY = 735
-    const rowH = 123
+    // Weekday block
+    ctx.save()
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.direction = isArabic ? 'rtl' : 'ltr'
+    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = '#718986'
+    ctx.fillText(isArabic ? 'اليوم' : 'Day', 540, 365)
+    ctx.font = `700 54px ${fontFamily}`; ctx.fillStyle = '#0b3f40'
+    ctx.fillText(weekDay, 540, 435)
+    ctx.font = `600 28px ${fontFamily}`; ctx.fillStyle = '#6e8582'
+    ctx.fillText(cityName, 540, 505)
+    ctx.restore()
+
+    // Hijri block
+    ctx.save()
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.direction = isArabic ? 'rtl' : 'ltr'
+    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = '#718986'
+    ctx.fillText(isArabic ? 'التاريخ الهجري' : 'Hijri', 867, 365)
+    ctx.font = `700 66px ${fontFamily}`; ctx.fillStyle = '#0d7c75'
+    ctx.fillText(hijriDay, 867, 438)
+    ctx.font = `600 27px ${fontFamily}`; ctx.fillStyle = '#163f40'
+    ctx.fillText(`${hijriMonth} ${hijriYear}`, 867, 505)
+    ctx.restore()
+
+    // Prayer board
+    const startY = 650
+    const rowH = 132
     prayerKeys.forEach((key, index) => {
       const y = startY + index * rowH
-      roundedRect(ctx, 86, y, 908, 92, 22)
-      ctx.fillStyle = index % 2 === 0 ? '#ffffff' : '#f5faf8'
+      roundedRect(ctx, 70, y, 940, 104, 18)
+      ctx.fillStyle = index % 2 === 0 ? '#ffffff' : '#f6faf9'
       ctx.fill()
-      ctx.strokeStyle = '#dcebe7'; ctx.lineWidth = 2; ctx.stroke()
+      ctx.strokeStyle = '#dbe9e5'; ctx.lineWidth = 2; ctx.stroke()
 
-      const prayerName = text.prayer[key as keyof typeof text.prayer]
+      const prayerAr = text.prayer[key as keyof typeof text.prayer]
       const { time, period } = getShareTimeParts(result.prayer_times[key])
 
+      // English left
       ctx.save()
       ctx.textBaseline = 'middle'
-      if (isArabic) {
-        ctx.direction = 'rtl'
-        ctx.textAlign = 'right'
-        ctx.font = `700 37px ${fontFamily}`
-        ctx.fillStyle = '#173f40'
-        ctx.fillText(prayerName, 905, y + 46)
+      ctx.direction = 'ltr'
+      ctx.textAlign = 'left'
+      ctx.font = `700 30px ${fontFamily}`
+      ctx.fillStyle = '#27494a'
+      ctx.fillText(prayerEn[key], 120, y + 52)
 
-        // Period is the far-left element, then the numeric time.
-        ctx.direction = 'ltr'
-        ctx.textAlign = 'left'
-        ctx.font = `700 31px ${fontFamily}`
-        ctx.fillStyle = '#0d7c75'
-        ctx.fillText(period, 145, y + 46)
-        ctx.font = `700 44px ${fontFamily}`
-        ctx.fillText(time, 205, y + 46)
-      } else {
-        ctx.direction = 'ltr'
-        ctx.textAlign = 'left'
-        ctx.font = `700 37px ${fontFamily}`
-        ctx.fillStyle = '#173f40'
-        ctx.fillText(prayerName, 145, y + 46)
-        ctx.textAlign = 'right'
-        ctx.font = `700 44px ${fontFamily}`
-        ctx.fillStyle = '#0d7c75'
-        ctx.fillText(`${time} ${period}`, 905, y + 46)
-      }
+      // Time center — period visually to the left
+      ctx.textAlign = 'center'
+      ctx.font = `700 48px ${fontFamily}`
+      ctx.fillStyle = '#0d7c75'
+      ctx.fillText(time, 540, y + 52)
+      ctx.textAlign = 'right'
+      ctx.font = `700 27px ${fontFamily}`
+      ctx.fillText(period, 452, y + 52)
+
+      // Arabic right
+      ctx.direction = 'rtl'
+      ctx.textAlign = 'right'
+      ctx.font = `700 40px ${fontFamily}`
+      ctx.fillStyle = '#173f40'
+      ctx.fillText(prayerAr, 940, y + 52)
       ctx.restore()
     })
 
-    roundedRect(ctx, 308, 1545, 464, 70, 35)
+    // Footer details
+    roundedRect(ctx, 110, 1510, 860, 104, 24)
+    ctx.fillStyle = '#f4faf8'; ctx.fill()
+    ctx.strokeStyle = '#dbe9e5'; ctx.lineWidth = 2; ctx.stroke()
+
+    ctx.save()
+    ctx.textBaseline = 'middle'
+    ctx.direction = isArabic ? 'rtl' : 'ltr'
+    ctx.textAlign = 'center'
+    ctx.font = `600 27px ${fontFamily}`
+    ctx.fillStyle = '#5f7a77'
+    ctx.fillText(
+      isArabic ? `المحافظة: ${governorateName}   •   المدينة: ${cityName}` : `${governorateName} • ${cityName}`,
+      540,
+      1544
+    )
+    ctx.font = `500 24px ${fontFamily}`
+    ctx.fillStyle = '#7a918e'
+    ctx.fillText(
+      isArabic ? `${formatResultDate(result.date)}   •   ${formatHijriDate(result.date)}` : `${formatResultDate(result.date)} • ${formatHijriDate(result.date)}`,
+      540,
+      1581
+    )
+    ctx.restore()
+
+    roundedRect(ctx, 320, 1660, 440, 66, 33)
     ctx.fillStyle = '#0d7c75'; ctx.fill()
-    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1580, `600 25px ${fontFamily}`, '#ffffff')
-    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1692, `500 29px ${fontFamily}`, '#557471')
+    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1693, `600 24px ${fontFamily}`, '#ffffff')
+    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1790, `500 27px ${fontFamily}`, '#557471')
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create image')), 'image/png', 1)
@@ -417,8 +461,8 @@ ${window.location.origin}`
     if (!ctx) throw new Error('Canvas is not supported')
 
     try {
-      await document.fonts.load('700 54px "IBM Plex Sans Arabic"')
-      await document.fonts.load('500 24px "IBM Plex Sans Arabic"')
+      await document.fonts.load('700 48px "IBM Plex Sans Arabic"')
+      await document.fonts.load('500 22px "IBM Plex Sans Arabic"')
     } catch {}
 
     const fontFamily = '"IBM Plex Sans Arabic", Arial, sans-serif'
@@ -426,98 +470,115 @@ ${window.location.origin}`
     const governorateName = isArabic ? weekResult.city.governorate.name_ar : weekResult.city.governorate.name_en
 
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920)
-    bg.addColorStop(0, '#eef8f5')
-    bg.addColorStop(.5, '#ffffff')
-    bg.addColorStop(1, '#e8f3f0')
+    bg.addColorStop(0, '#eef7f4')
+    bg.addColorStop(.55, '#ffffff')
+    bg.addColorStop(1, '#e8f2ef')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, 1080, 1920)
 
-    roundedRect(ctx, 398, 62, 284, 62, 31)
-    ctx.fillStyle = '#ddf2ed'; ctx.fill()
-    drawCenteredText(ctx, 'IQPR Time', 93, `700 33px ${fontFamily}`, '#073f40')
-    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة للأيام السبعة' : '7-day prayer times', 180, `700 48px ${fontFamily}`, '#0b3334')
-    drawCenteredText(ctx, `${cityName} · ${governorateName}`, 242, `700 34px ${fontFamily}`, '#0d6f69')
-    drawCenteredText(ctx, `${formatShortGregorian(weekResult.start_date)} — ${formatShortGregorian(weekResult.end_date)}`, 295, `500 25px ${fontFamily}`, '#6a817f')
+    roundedRect(ctx, 390, 58, 300, 66, 33)
+    ctx.fillStyle = '#dcefeb'; ctx.fill()
+    drawCenteredText(ctx, 'IQPR Time', 91, `700 34px ${fontFamily}`, '#073f40')
+    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة للأيام السبعة' : '7-day prayer times', 170, `700 46px ${fontFamily}`, '#0b3334')
+    drawCenteredText(ctx, `${cityName} · ${governorateName}`, 226, `700 31px ${fontFamily}`, '#0d746e')
 
-    const cardX = 58
-    const cardW = 964
-    const startY = 345
-    const dayH = 191
+    // Range summary board
+    roundedRect(ctx, 86, 274, 908, 110, 22)
+    ctx.fillStyle = '#ffffff'; ctx.fill()
+    ctx.strokeStyle = '#d7e6e2'; ctx.lineWidth = 2; ctx.stroke()
+    drawCenteredText(
+      ctx,
+      `${formatShortGregorian(weekResult.start_date)} — ${formatShortGregorian(weekResult.end_date)}`,
+      310,
+      `700 28px ${fontFamily}`,
+      '#173f40'
+    )
+    drawCenteredText(
+      ctx,
+      `${formatShortHijri(weekResult.start_date)} — ${formatShortHijri(weekResult.end_date)}`,
+      350,
+      `500 23px ${fontFamily}`,
+      '#718986'
+    )
+
+    // Column headers once
+    const colXs = [180, 324, 468, 612, 756, 900]
+    roundedRect(ctx, 58, 420, 964, 72, 18)
+    ctx.fillStyle = '#0d7c75'; ctx.fill()
+    prayerKeys.forEach((key, i) => {
+      ctx.save()
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.direction = isArabic ? 'rtl' : 'ltr'
+      ctx.font = `700 22px ${fontFamily}`
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(text.prayer[key as keyof typeof text.prayer], colXs[i], 456)
+      ctx.restore()
+    })
+
+    const startY = 515
+    const dayH = 181
 
     weekResult.days.slice(0, 7).forEach((day, dayIndex) => {
       const y = startY + dayIndex * dayH
-      roundedRect(ctx, cardX, y, cardW, 168, 24)
-      ctx.fillStyle = dayIndex % 2 === 0 ? '#ffffff' : '#f6faf9'
+      roundedRect(ctx, 58, y, 964, 157, 20)
+      ctx.fillStyle = dayIndex % 2 === 0 ? '#ffffff' : '#f7faf9'
       ctx.fill()
-      ctx.strokeStyle = '#dcebe7'; ctx.lineWidth = 2; ctx.stroke()
+      ctx.strokeStyle = '#dce9e5'; ctx.lineWidth = 2; ctx.stroke()
 
-      // Day/date strip.
+      // top strip: Gregorian | weekday | Hijri
+      ctx.strokeStyle = '#e5efec'; ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(90, y + 58); ctx.lineTo(990, y + 58); ctx.stroke()
+
+      const dateObj = new Date(`${day.date}T00:00:00`)
+      const gregShort = formatShortGregorian(day.date)
+      const hijriShort = formatShortHijri(day.date)
+      const weekday = formatWeekDay(day.date)
+
       ctx.save()
       ctx.textBaseline = 'middle'
-      if (isArabic) {
-        ctx.direction = 'rtl'
-        ctx.textAlign = 'right'
-        ctx.font = `700 28px ${fontFamily}`
-        ctx.fillStyle = '#123f40'
-        ctx.fillText(formatWeekDay(day.date), 958, y + 35)
-        ctx.font = `500 21px ${fontFamily}`
-        ctx.fillStyle = '#718985'
-        ctx.fillText(`${formatShortGregorian(day.date)}  ·  ${formatShortHijri(day.date)}`, 820, y + 35)
-      } else {
-        ctx.direction = 'ltr'
-        ctx.textAlign = 'left'
-        ctx.font = `700 28px ${fontFamily}`
-        ctx.fillStyle = '#123f40'
-        ctx.fillText(formatWeekDay(day.date), 120, y + 35)
-        ctx.font = `500 21px ${fontFamily}`
-        ctx.fillStyle = '#718985'
-        ctx.fillText(`${formatShortGregorian(day.date)}  ·  ${formatShortHijri(day.date)}`, 250, y + 35)
-      }
+
+      ctx.direction = isArabic ? 'rtl' : 'ltr'
+      ctx.textAlign = 'left'
+      ctx.font = `600 20px ${fontFamily}`
+      ctx.fillStyle = '#6f8884'
+      ctx.fillText(gregShort, 96, y + 31)
+
+      ctx.textAlign = 'center'
+      ctx.font = `700 28px ${fontFamily}`
+      ctx.fillStyle = '#123f40'
+      ctx.fillText(weekday, 540, y + 31)
+
+      ctx.textAlign = 'right'
+      ctx.font = `600 20px ${fontFamily}`
+      ctx.fillStyle = '#6f8884'
+      ctx.fillText(hijriShort, 984, y + 31)
       ctx.restore()
 
-      ctx.strokeStyle = '#e6efed'; ctx.lineWidth = 1.5
-      ctx.beginPath(); ctx.moveTo(95, y + 67); ctx.lineTo(985, y + 67); ctx.stroke()
-
-      const cellW = 144
-      const firstX = 100
       prayerKeys.forEach((key, i) => {
-        const cx = firstX + i * cellW + cellW / 2
-        const label = text.prayer[key as keyof typeof text.prayer]
         const { time, period } = getShareTimeParts(day[key as keyof WeekDay] as string)
-
+        const cx = colXs[i]
         ctx.save()
-        ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.direction = isArabic ? 'rtl' : 'ltr'
-        ctx.font = `600 20px ${fontFamily}`
-        ctx.fillStyle = '#708784'
-        ctx.fillText(label, cx, y + 96)
-
         ctx.direction = 'ltr'
+        ctx.textAlign = 'center'
+        ctx.font = `700 29px ${fontFamily}`
         ctx.fillStyle = '#0d7c75'
+        ctx.fillText(time, cx, y + 102)
 
-        if (isArabic) {
-          // Keep ص / م visually on the left of the numeric time.
-          ctx.textAlign = 'right'
-          ctx.font = `700 28px ${fontFamily}`
-          ctx.fillText(time, cx + 28, y + 132)
-
-          ctx.textAlign = 'left'
-          ctx.font = `700 22px ${fontFamily}`
-          ctx.fillText(period, cx - 48, y + 132)
-        } else {
-          ctx.textAlign = 'center'
-          ctx.font = `700 28px ${fontFamily}`
-          ctx.fillText(`${time} ${period}`, cx, y + 132)
-        }
+        // period always on the visual left
+        ctx.textAlign = 'right'
+        ctx.font = `700 19px ${fontFamily}`
+        ctx.fillText(period, cx - 37, y + 102)
         ctx.restore()
       })
     })
 
-    roundedRect(ctx, 310, 1725, 460, 66, 33)
+    // Footer safely above Instagram controls
+    roundedRect(ctx, 315, 1722, 450, 64, 32)
     ctx.fillStyle = '#0d7c75'; ctx.fill()
-    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1758, `600 24px ${fontFamily}`, '#ffffff')
-    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1833, `500 27px ${fontFamily}`, '#557471')
+    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1754, `600 23px ${fontFamily}`, '#ffffff')
+    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1830, `500 26px ${fontFamily}`, '#557471')
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create weekly image')), 'image/png', 1)
