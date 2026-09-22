@@ -580,3 +580,53 @@ select.form-control { cursor: pointer; }
   .week-day-card header { align-items: center; }
   .week-day-card header small { max-width: 56%; }
 }
+
+
+/* Weekly share image preview */
+.week-image-section {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+.week-image-frame {
+  width: min(100%, 440px);
+  margin-inline: auto;
+  border: 1px solid #d7e7e3;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #f7fbfa;
+  box-shadow: 0 10px 30px rgba(15, 73, 70, .08);
+}
+.week-image-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.week-image-loading {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: var(--muted);
+}
+.week-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+@media (max-width: 560px) {
+  .week-image-frame {
+    width: 100%;
+    border-radius: 18px;
+  }
+  .week-image-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .week-image-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
