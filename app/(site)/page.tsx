@@ -25,6 +25,7 @@ export default function HomePage() {
   const [date, setDate] = useState(todayInBaghdad)
   const pendingLocationCityRef = useRef<string | null>(null)
   const [locationSelectionVersion, setLocationSelectionVersion] = useState(0)
+  const [storageHydrated, setStorageHydrated] = useState(false)
   const [loadingCities, setLoadingCities] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -70,19 +71,43 @@ export default function HomePage() {
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem('iqpr:last-location')
-      if (!saved) return
-      const parsed = JSON.parse(saved) as { governorate?: string; city?: string }
-      if (parsed.governorate) setGovernorate(parsed.governorate)
-      if (parsed.city) setCity(parsed.city)
-    } catch {}
+
+      if (saved) {
+        const parsed = JSON.parse(saved) as {
+          governorate?: string
+          city?: string
+        }
+
+        if (parsed.governorate) {
+          if (parsed.city) {
+            pendingLocationCityRef.current = parsed.city
+          }
+
+          setCity('')
+          setGovernorate(parsed.governorate)
+          setLocationSelectionVersion(version => version + 1)
+        }
+      }
+    } catch {
+      // Ignore invalid/stale localStorage values.
+    } finally {
+      setStorageHydrated(true)
+    }
   }, [])
 
   useEffect(() => {
+    if (!storageHydrated) return
     if (!governorate || !city) return
+    if (loadingCities) return
+    if (!cities.some(item => item.slug === city)) return
+
     try {
-      window.localStorage.setItem('iqpr:last-location', JSON.stringify({ governorate, city }))
+      window.localStorage.setItem(
+        'iqpr:last-location',
+        JSON.stringify({ governorate, city })
+      )
     } catch {}
-  }, [governorate, city])
+  }, [storageHydrated, governorate, city, cities, loadingCities])
 
   useEffect(() => {
     fetch('/api/v1/governorates').then(r => r.json()).then(body => { if (body.success) setGovernorates(body.data.governorates) }).catch(() => setError(isArabic ? 'تعذر تحميل المحافظات.' : 'Could not load governorates.'))
@@ -324,34 +349,34 @@ ${window.location.origin}`
     }
 
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920)
-    bg.addColorStop(0, '#043A2E')
-    bg.addColorStop(.55, '#052E24')
-    bg.addColorStop(1, '#06251C')
+    bg.addColorStop(0, '#eef7f4')
+    bg.addColorStop(.55, '#ffffff')
+    bg.addColorStop(1, '#e8f2ef')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, 1080, 1920)
 
     // subtle decorative corners
-    ctx.globalAlpha = .14
-    ctx.fillStyle = '#D4AF37'
+    ctx.globalAlpha = .18
+    ctx.fillStyle = '#a9d9cf'
     ctx.beginPath(); ctx.arc(1030, 80, 220, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = '#D4AF37'
+    ctx.fillStyle = '#efd69b'
     ctx.beginPath(); ctx.arc(20, 1880, 190, 0, Math.PI * 2); ctx.fill()
     ctx.globalAlpha = 1
 
     // Brand
     roundedRect(ctx, 390, 64, 300, 70, 35)
-    ctx.fillStyle = 'rgba(212,175,55,0.12)'; ctx.fill()
-    drawCenteredText(ctx, 'IQPR Time', 99, `700 36px ${fontFamily}`, '#E8CF7A')
-    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today', 190, `700 50px ${fontFamily}`, '#F3EEE1')
-    drawCenteredText(ctx, `${cityName} · ${governorateName}`, 250, `700 33px ${fontFamily}`, '#E8CF7A')
+    ctx.fillStyle = '#dcefeb'; ctx.fill()
+    drawCenteredText(ctx, 'IQPR Time', 99, `700 36px ${fontFamily}`, '#073f40')
+    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today', 190, `700 50px ${fontFamily}`, '#0b3334')
+    drawCenteredText(ctx, `${cityName} · ${governorateName}`, 250, `700 33px ${fontFamily}`, '#0d746e')
 
     // Date board inspired by mosque display screens
     roundedRect(ctx, 66, 315, 948, 270, 30)
-    ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill()
-    ctx.strokeStyle = 'rgba(212,175,55,0.35)'; ctx.lineWidth = 3; ctx.stroke()
+    ctx.fillStyle = '#ffffff'; ctx.fill()
+    ctx.strokeStyle = '#d4e5e1'; ctx.lineWidth = 3; ctx.stroke()
 
     // separators
-    ctx.strokeStyle = 'rgba(212,175,55,0.25)'; ctx.lineWidth = 2
+    ctx.strokeStyle = '#e3ece9'; ctx.lineWidth = 2
     ctx.beginPath(); ctx.moveTo(360, 345); ctx.lineTo(360, 555); ctx.stroke()
     ctx.beginPath(); ctx.moveTo(720, 345); ctx.lineTo(720, 555); ctx.stroke()
 
@@ -359,11 +384,11 @@ ${window.location.origin}`
     ctx.save()
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.direction = isArabic ? 'rtl' : 'ltr'
-    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = 'rgba(243,238,225,0.55)'
+    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = '#718986'
     ctx.fillText(isArabic ? 'التاريخ الميلادي' : 'Gregorian', 213, 365)
-    ctx.font = `700 66px ${fontFamily}`; ctx.fillStyle = '#E8CF7A'
+    ctx.font = `700 66px ${fontFamily}`; ctx.fillStyle = '#0d7c75'
     ctx.fillText(gregDay, 213, 438)
-    ctx.font = `600 27px ${fontFamily}`; ctx.fillStyle = 'rgba(243,238,225,0.75)'
+    ctx.font = `600 27px ${fontFamily}`; ctx.fillStyle = '#163f40'
     ctx.fillText(`${gregMonth} ${gregYear}`, 213, 505)
     ctx.restore()
 
@@ -371,11 +396,11 @@ ${window.location.origin}`
     ctx.save()
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.direction = isArabic ? 'rtl' : 'ltr'
-    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = 'rgba(243,238,225,0.55)'
+    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = '#718986'
     ctx.fillText(isArabic ? 'اليوم' : 'Day', 540, 365)
-    ctx.font = `700 54px ${fontFamily}`; ctx.fillStyle = '#F3EEE1'
+    ctx.font = `700 54px ${fontFamily}`; ctx.fillStyle = '#0b3f40'
     ctx.fillText(weekDay, 540, 435)
-    ctx.font = `600 28px ${fontFamily}`; ctx.fillStyle = 'rgba(243,238,225,0.6)'
+    ctx.font = `600 28px ${fontFamily}`; ctx.fillStyle = '#6e8582'
     ctx.fillText(cityName, 540, 505)
     ctx.restore()
 
@@ -383,11 +408,11 @@ ${window.location.origin}`
     ctx.save()
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.direction = isArabic ? 'rtl' : 'ltr'
-    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = 'rgba(243,238,225,0.55)'
+    ctx.font = `500 27px ${fontFamily}`; ctx.fillStyle = '#718986'
     ctx.fillText(isArabic ? 'التاريخ الهجري' : 'Hijri', 867, 365)
-    ctx.font = `700 66px ${fontFamily}`; ctx.fillStyle = '#E8CF7A'
+    ctx.font = `700 66px ${fontFamily}`; ctx.fillStyle = '#0d7c75'
     ctx.fillText(hijriDay, 867, 438)
-    ctx.font = `600 27px ${fontFamily}`; ctx.fillStyle = 'rgba(243,238,225,0.75)'
+    ctx.font = `600 27px ${fontFamily}`; ctx.fillStyle = '#163f40'
     ctx.fillText(`${hijriMonth} ${hijriYear}`, 867, 505)
     ctx.restore()
 
@@ -397,9 +422,9 @@ ${window.location.origin}`
     prayerKeys.forEach((key, index) => {
       const y = startY + index * rowH
       roundedRect(ctx, 70, y, 940, 104, 18)
-      ctx.fillStyle = index % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)'
+      ctx.fillStyle = index % 2 === 0 ? '#ffffff' : '#f6faf9'
       ctx.fill()
-      ctx.strokeStyle = 'rgba(212,175,55,0.2)'; ctx.lineWidth = 2; ctx.stroke()
+      ctx.strokeStyle = '#dbe9e5'; ctx.lineWidth = 2; ctx.stroke()
 
       const prayerAr = text.prayer[key as keyof typeof text.prayer]
       const { time, period } = getShareTimeParts(result.prayer_times[key])
@@ -410,46 +435,45 @@ ${window.location.origin}`
       ctx.direction = 'ltr'
       ctx.textAlign = 'left'
       ctx.font = `700 30px ${fontFamily}`
-      ctx.fillStyle = 'rgba(243,238,225,0.45)'
+      ctx.fillStyle = '#27494a'
       ctx.fillText(prayerEn[key], 120, y + 52)
 
       // Time center — period visually to the left
       ctx.textAlign = 'center'
       ctx.font = `700 48px ${fontFamily}`
-      ctx.fillStyle = '#E8CF7A'
+      ctx.fillStyle = '#0d7c75'
       ctx.fillText(time, 540, y + 52)
       ctx.textAlign = 'right'
       ctx.font = `700 27px ${fontFamily}`
-      ctx.fillStyle = 'rgba(243,238,225,0.6)'
       ctx.fillText(period, 452, y + 52)
 
       // Arabic right
       ctx.direction = 'rtl'
       ctx.textAlign = 'right'
       ctx.font = `700 40px ${fontFamily}`
-      ctx.fillStyle = '#F3EEE1'
+      ctx.fillStyle = '#173f40'
       ctx.fillText(prayerAr, 940, y + 52)
       ctx.restore()
     })
 
     // Footer details
     roundedRect(ctx, 110, 1510, 860, 104, 24)
-    ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fill()
-    ctx.strokeStyle = 'rgba(212,175,55,0.2)'; ctx.lineWidth = 2; ctx.stroke()
+    ctx.fillStyle = '#f4faf8'; ctx.fill()
+    ctx.strokeStyle = '#dbe9e5'; ctx.lineWidth = 2; ctx.stroke()
 
     ctx.save()
     ctx.textBaseline = 'middle'
     ctx.direction = isArabic ? 'rtl' : 'ltr'
     ctx.textAlign = 'center'
     ctx.font = `600 27px ${fontFamily}`
-    ctx.fillStyle = 'rgba(243,238,225,0.85)'
+    ctx.fillStyle = '#5f7a77'
     ctx.fillText(
       isArabic ? `المحافظة: ${governorateName}   •   المدينة: ${cityName}` : `${governorateName} • ${cityName}`,
       540,
       1544
     )
     ctx.font = `500 24px ${fontFamily}`
-    ctx.fillStyle = 'rgba(243,238,225,0.55)'
+    ctx.fillStyle = '#7a918e'
     ctx.fillText(
       isArabic ? `${formatResultDate(result.date)}   •   ${formatHijriDate(result.date)}` : `${formatResultDate(result.date)} • ${formatHijriDate(result.date)}`,
       540,
@@ -458,9 +482,9 @@ ${window.location.origin}`
     ctx.restore()
 
     roundedRect(ctx, 320, 1660, 440, 66, 33)
-    ctx.fillStyle = '#D4AF37'; ctx.fill()
-    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1693, `600 24px ${fontFamily}`, '#06251C')
-    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1790, `500 27px ${fontFamily}`, 'rgba(232,207,122,0.85)')
+    ctx.fillStyle = '#0d7c75'; ctx.fill()
+    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1693, `600 24px ${fontFamily}`, '#ffffff')
+    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1790, `500 27px ${fontFamily}`, '#557471')
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create image')), 'image/png', 1)
@@ -486,44 +510,44 @@ ${window.location.origin}`
     const governorateName = isArabic ? weekResult.city.governorate.name_ar : weekResult.city.governorate.name_en
 
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920)
-    bg.addColorStop(0, '#043A2E')
-    bg.addColorStop(.55, '#052E24')
-    bg.addColorStop(1, '#06251C')
+    bg.addColorStop(0, '#eef7f4')
+    bg.addColorStop(.55, '#ffffff')
+    bg.addColorStop(1, '#edf5f2')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, 1080, 1920)
 
     // Soft premium accents.
-    ctx.globalAlpha = .16
-    ctx.fillStyle = '#D4AF37'
+    ctx.globalAlpha = .18
+    ctx.fillStyle = '#d8c28d'
     ctx.beginPath(); ctx.arc(45, 1835, 160, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = '#D4AF37'
+    ctx.fillStyle = '#b8ddd5'
     ctx.beginPath(); ctx.arc(1035, 70, 190, 0, Math.PI * 2); ctx.fill()
     ctx.globalAlpha = 1
 
     roundedRect(ctx, 390, 58, 300, 66, 33)
-    ctx.fillStyle = 'rgba(212,175,55,0.12)'; ctx.fill()
-    drawCenteredText(ctx, 'IQPR Time', 91, `700 34px ${fontFamily}`, '#E8CF7A')
-    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا الأسبوع' : 'Prayer times for this week', 170, `700 46px ${fontFamily}`, '#F3EEE1')
-    drawCenteredText(ctx, `${cityName} · ${governorateName}`, 226, `700 31px ${fontFamily}`, '#E8CF7A')
+    ctx.fillStyle = '#dcefeb'; ctx.fill()
+    drawCenteredText(ctx, 'IQPR Time', 91, `700 34px ${fontFamily}`, '#073f40')
+    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا الأسبوع' : 'Prayer times for this week', 170, `700 46px ${fontFamily}`, '#0b3334')
+    drawCenteredText(ctx, `${cityName} · ${governorateName}`, 226, `700 31px ${fontFamily}`, '#0d746e')
 
-    // Weekly range card with a gold accent.
+    // Weekly range card with a soft beige accent.
     roundedRect(ctx, 120, 274, 840, 108, 22)
-    ctx.fillStyle = 'rgba(212,175,55,0.08)'; ctx.fill()
-    ctx.strokeStyle = 'rgba(212,175,55,0.4)'; ctx.lineWidth = 2; ctx.stroke()
+    ctx.fillStyle = '#fffaf0'; ctx.fill()
+    ctx.strokeStyle = '#dfc98e'; ctx.lineWidth = 2; ctx.stroke()
 
     drawCenteredText(
       ctx,
       `${formatShortGregorian(weekResult.start_date)} — ${formatShortGregorian(weekResult.end_date)}`,
       310,
       `700 28px ${fontFamily}`,
-      '#F3EEE1'
+      '#173f40'
     )
     drawCenteredText(
       ctx,
       `${formatShortHijri(weekResult.start_date)} — ${formatShortHijri(weekResult.end_date)}`,
       349,
       `500 23px ${fontFamily}`,
-      'rgba(243,238,225,0.55)'
+      '#718986'
     )
 
     // Table header. Extra side margins keep Instagram story controls away.
@@ -535,7 +559,7 @@ ${window.location.origin}`
       : Array.from({ length: 6 }, (_, i) => tableX + colStep / 2 + i * colStep)
 
     roundedRect(ctx, tableX, 418, tableW, 70, 18)
-    ctx.fillStyle = '#D4AF37'; ctx.fill()
+    ctx.fillStyle = '#0b706a'; ctx.fill()
 
     prayerKeys.forEach((key, i) => {
       ctx.save()
@@ -543,7 +567,7 @@ ${window.location.origin}`
       ctx.textBaseline = 'middle'
       ctx.direction = isArabic ? 'rtl' : 'ltr'
       ctx.font = `700 21px ${fontFamily}`
-      ctx.fillStyle = '#06251C'
+      ctx.fillStyle = '#ffffff'
       ctx.fillText(text.prayer[key as keyof typeof text.prayer], colXs[i], 453)
       ctx.restore()
     })
@@ -561,13 +585,13 @@ ${window.location.origin}`
       roundedRect(ctx, tableX, y, tableW, 146, 20)
 
       if (isFriday) {
-        ctx.fillStyle = 'rgba(212,175,55,0.14)'
+        ctx.fillStyle = '#fff8e7'
       } else {
-        ctx.fillStyle = dayIndex % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)'
+        ctx.fillStyle = dayIndex % 2 === 0 ? '#ffffff' : '#f3f8f6'
       }
       ctx.fill()
 
-      ctx.strokeStyle = isFriday ? '#D4AF37' : 'rgba(212,175,55,0.2)'
+      ctx.strokeStyle = isFriday ? '#d5b56a' : '#dce9e5'
       ctx.lineWidth = isFriday ? 3 : 2
       ctx.stroke()
 
@@ -577,16 +601,16 @@ ${window.location.origin}`
       ctx.textBaseline = 'middle'
       ctx.direction = isArabic ? 'rtl' : 'ltr'
       ctx.font = `700 27px ${fontFamily}`
-      ctx.fillStyle = isFriday ? '#E8CF7A' : '#F3EEE1'
+      ctx.fillStyle = isFriday ? '#9a6c13' : '#123f40'
       ctx.fillText(weekday, 540, y + 27)
 
       // Gregorian and Hijri together on a single organized line.
       ctx.font = `500 19px ${fontFamily}`
-      ctx.fillStyle = isFriday ? 'rgba(232,207,122,0.7)' : 'rgba(243,238,225,0.55)'
+      ctx.fillStyle = '#748a87'
       ctx.fillText(`${gregShort}  •  ${hijriShort}`, 540, y + 57)
       ctx.restore()
 
-      ctx.strokeStyle = isFriday ? 'rgba(212,175,55,0.4)' : 'rgba(212,175,55,0.2)'
+      ctx.strokeStyle = isFriday ? '#ead7a6' : '#e6efed'
       ctx.lineWidth = 1.5
       ctx.beginPath()
       ctx.moveTo(tableX + 26, y + 76)
@@ -603,13 +627,12 @@ ${window.location.origin}`
 
         ctx.textAlign = 'center'
         ctx.font = `700 28px ${fontFamily}`
-        ctx.fillStyle = '#E8CF7A'
+        ctx.fillStyle = isFriday ? '#8d6b23' : '#0d7c75'
         ctx.fillText(time, cx + 5, y + 112)
 
         // ص / م stays visually on the left side of the numeric time.
         ctx.textAlign = 'right'
         ctx.font = `700 18px ${fontFamily}`
-        ctx.fillStyle = 'rgba(243,238,225,0.55)'
         ctx.fillText(period, cx - 34, y + 112)
         ctx.restore()
       })
@@ -617,15 +640,15 @@ ${window.location.origin}`
 
     // CTA, kept safely away from Instagram's bottom controls.
     roundedRect(ctx, 280, 1660, 520, 72, 36)
-    ctx.fillStyle = '#D4AF37'; ctx.fill()
-    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1696, `700 26px ${fontFamily}`, '#06251C')
+    ctx.fillStyle = '#0b706a'; ctx.fill()
+    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1696, `700 26px ${fontFamily}`, '#ffffff')
 
     drawCenteredText(
       ctx,
       isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times',
       1770,
       `600 29px ${fontFamily}`,
-      'rgba(232,207,122,0.85)'
+      '#4f716e'
     )
 
     return await new Promise<Blob>((resolve, reject) => {
@@ -723,9 +746,11 @@ ${window.location.origin}`
         // reloaded for the detected governorate first, then the detected city
         // is applied only if it belongs to that list.
         pendingLocationCityRef.current = nextCity
+        setCity('')
         setGovernorate(nextGovernorate)
         setLocationSelectionVersion(version => version + 1)
         setResult(null)
+        setWeekResult(null)
       } catch {
         setError(text.locationError)
       } finally {
@@ -746,8 +771,18 @@ ${window.location.origin}`
       <div className="hero-copy"><span className="eyebrow"><Sparkles size={16} /> {text.eyebrow}</span><h1 className="title-xl">{text.titleA}<br /><span>{text.titleB}</span></h1><p className="lead">{text.lead}</p><div className="hero-actions"><a href="#query" className="btn btn-primary btn-lg">{text.try} <Arrow size={18} /></a><Link href="/docs" className="btn btn-secondary btn-lg"><Code2 size={18} /> {text.docs}</Link></div><div className="trust-row"><span><CheckCircle2 size={16} /> {text.free}</span><span><CheckCircle2 size={16} /> {text.noAccount}</span><span><CheckCircle2 size={16} /> {text.timezone}</span></div></div>
       <div className="query-card" id="query"><div className="query-card-inner"><div className="query-head"><div><h2 className="title-md">{text.queryTitle}</h2><p>{text.querySub}</p></div><div className="query-head-actions"><button type="button" className="btn btn-secondary btn-sm location-btn" onClick={useMyLocation} disabled={locating}>{locating ? <LoaderCircle className="spin" size={16} /> : <LocateFixed size={16} />}{locating ? text.locating : text.useLocation}</button><span className="icon-box gold"><MapPin size={21} /></span></div></div>
         <form className="query-form" onSubmit={submitQuery}><div className="query-row">
-          <div className="field"><label htmlFor="home-governorate">{text.gov}</label><div className="input-wrap"><MapPin className="input-icon" size={17} /><select id="home-governorate" className="form-control" value={governorate} onChange={e => { setGovernorate(e.target.value); setResult(null) }}><option value="">{text.selectGov}</option>{governorates.map(item => <option key={item.id} value={item.slug}>{isArabic ? item.name_ar : item.name_en}</option>)}</select></div></div>
-          <div className="field"><label htmlFor="home-city">{text.city}</label><div className="input-wrap"><ChevronDown className="input-icon" size={17} /><select id="home-city" className="form-control" value={city} disabled={loadingCities || !cities.length} onChange={e => { setCity(e.target.value); setResult(null) }}><option value="">{loadingCities ? text.loadingCities : text.selectCity}</option>{cities.map(item => <option key={item.id} value={item.slug}>{isArabic ? item.name_ar : item.name_en}</option>)}</select></div></div>
+          <div className="field"><label htmlFor="home-governorate">{text.gov}</label><div className="input-wrap"><MapPin className="input-icon" size={17} /><select id="home-governorate" className="form-control" value={governorate} onChange={e => {
+  pendingLocationCityRef.current = null
+  setCity('')
+  setGovernorate(e.target.value)
+  setResult(null)
+  setWeekResult(null)
+}}><option value="">{text.selectGov}</option>{governorates.map(item => <option key={item.id} value={item.slug}>{isArabic ? item.name_ar : item.name_en}</option>)}</select></div></div>
+          <div className="field"><label htmlFor="home-city">{text.city}</label><div className="input-wrap"><ChevronDown className="input-icon" size={17} /><select id="home-city" className="form-control" value={city} disabled={loadingCities || !cities.length} onChange={e => {
+  setCity(e.target.value)
+  setResult(null)
+  setWeekResult(null)
+}}><option value="">{loadingCities ? text.loadingCities : text.selectCity}</option>{cities.map(item => <option key={item.id} value={item.slug}>{isArabic ? item.name_ar : item.name_en}</option>)}</select></div></div>
         </div><div className="field"><label htmlFor="home-date">{text.date}</label><div className="date-picker-wrap"><div className="date-display" aria-hidden="true"><CalendarDays size={17} /><span>{date ? new Date(`${date}T00:00:00`).toLocaleDateString(isArabic ? 'ar-IQ' : 'en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }) : text.date}</span></div><input id="home-date" type="date" className="date-native-input" value={date} onChange={e => { setDate(e.target.value); setResult(null) }} min="2026-01-01" max="2026-12-31" aria-label={text.date} /></div></div>{error && <div className="query-error"><ShieldCheck size={16} /> {error}</div>}<button className="btn btn-primary btn-lg w-full" disabled={loading || loadingCities}>{loading ? <LoaderCircle className="spin" size={19} /> : <Search size={19} />}{loading ? text.searching : text.search}</button></form>
         {result && <div className="result-panel">
           <div className="result-context result-context-premium">
@@ -778,6 +813,6 @@ ${window.location.origin}`
     </div></section>
     <section className="section section-soft"><div className="container stats-grid">{text.stats.map(([number, label]) => <div className="card stat" key={label}><strong>{number}</strong><span>{label}</span></div>)}</div></section>
     <section className="section"><div className="container"><div className="section-heading center"><span className="eyebrow"><Zap size={16} /> {text.whyEyebrow}</span><h2 className="title-lg">{text.whyTitle}</h2><p className="lead">{text.whyLead}</p></div><div className="features-grid">{text.features.map(([title, description], index) => { const Icon = featureIcons[index]; return <article className="card feature-card" key={title}><span className={`icon-box ${index % 3 === 1 ? 'gold' : ''}`}><Icon size={21} /></span><h3>{title}</h3><p>{description}</p></article> })}</div></div></section>
-    <section className="section section-soft"><div className="container developer-panel"><div className="developer-copy"><span className="eyebrow" style={{ color: '#E8CF7A' }}><Braces size={16} /> {text.devEyebrow}</span><h2 className="title-lg">{text.devTitle}</h2><p>{text.devLead}</p><Link href="/docs" className="btn btn-primary">{text.devCta} <Arrow size={17} /></Link></div><div className="developer-code"><div className="code-toolbar"><span>{text.codeLabel}</span><span className="badge">GET</span></div><pre className="code-block"><code>{codeSample}</code></pre></div></div></section>
+    <section className="section section-soft"><div className="container developer-panel"><div className="developer-copy"><span className="eyebrow" style={{ color: '#7ed8ca' }}><Braces size={16} /> {text.devEyebrow}</span><h2 className="title-lg">{text.devTitle}</h2><p>{text.devLead}</p><Link href="/docs" className="btn btn-primary">{text.devCta} <Arrow size={17} /></Link></div><div className="developer-code"><div className="code-toolbar"><span>{text.codeLabel}</span><span className="badge">GET</span></div><pre className="code-block"><code>{codeSample}</code></pre></div></div></section>
   </>
 }
