@@ -487,9 +487,17 @@ ${window.location.origin}`
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920)
     bg.addColorStop(0, '#eef7f4')
     bg.addColorStop(.55, '#ffffff')
-    bg.addColorStop(1, '#e8f2ef')
+    bg.addColorStop(1, '#edf5f2')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, 1080, 1920)
+
+    // Soft premium accents.
+    ctx.globalAlpha = .18
+    ctx.fillStyle = '#d8c28d'
+    ctx.beginPath(); ctx.arc(45, 1835, 160, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = '#b8ddd5'
+    ctx.beginPath(); ctx.arc(1035, 70, 190, 0, Math.PI * 2); ctx.fill()
+    ctx.globalAlpha = 1
 
     roundedRect(ctx, 390, 58, 300, 66, 33)
     ctx.fillStyle = '#dcefeb'; ctx.fill()
@@ -497,10 +505,11 @@ ${window.location.origin}`
     drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا الأسبوع' : 'Prayer times for this week', 170, `700 46px ${fontFamily}`, '#0b3334')
     drawCenteredText(ctx, `${cityName} · ${governorateName}`, 226, `700 31px ${fontFamily}`, '#0d746e')
 
-    // Range summary board
-    roundedRect(ctx, 86, 274, 908, 110, 22)
-    ctx.fillStyle = '#ffffff'; ctx.fill()
-    ctx.strokeStyle = '#d7e6e2'; ctx.lineWidth = 2; ctx.stroke()
+    // Weekly range card with a soft beige accent.
+    roundedRect(ctx, 120, 274, 840, 108, 22)
+    ctx.fillStyle = '#fffaf0'; ctx.fill()
+    ctx.strokeStyle = '#dfc98e'; ctx.lineWidth = 2; ctx.stroke()
+
     drawCenteredText(
       ctx,
       `${formatShortGregorian(weekResult.start_date)} — ${formatShortGregorian(weekResult.end_date)}`,
@@ -511,89 +520,111 @@ ${window.location.origin}`
     drawCenteredText(
       ctx,
       `${formatShortHijri(weekResult.start_date)} — ${formatShortHijri(weekResult.end_date)}`,
-      350,
+      349,
       `500 23px ${fontFamily}`,
       '#718986'
     )
 
-    // Column headers once
-    const colXs = isArabic ? [900, 756, 612, 468, 324, 180] : [180, 324, 468, 612, 756, 900]
-    roundedRect(ctx, 58, 420, 964, 72, 18)
-    ctx.fillStyle = '#0d7c75'; ctx.fill()
+    // Table header. Extra side margins keep Instagram story controls away.
+    const tableX = 120
+    const tableW = 840
+    const colStep = tableW / 6
+    const colXs = isArabic
+      ? Array.from({ length: 6 }, (_, i) => tableX + tableW - colStep / 2 - i * colStep)
+      : Array.from({ length: 6 }, (_, i) => tableX + colStep / 2 + i * colStep)
+
+    roundedRect(ctx, tableX, 418, tableW, 70, 18)
+    ctx.fillStyle = '#0b706a'; ctx.fill()
+
     prayerKeys.forEach((key, i) => {
       ctx.save()
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.direction = isArabic ? 'rtl' : 'ltr'
-      ctx.font = `700 22px ${fontFamily}`
+      ctx.font = `700 21px ${fontFamily}`
       ctx.fillStyle = '#ffffff'
-      ctx.fillText(text.prayer[key as keyof typeof text.prayer], colXs[i], 456)
+      ctx.fillText(text.prayer[key as keyof typeof text.prayer], colXs[i], 453)
       ctx.restore()
     })
 
-    const startY = 515
-    const dayH = 181
+    const startY = 508
+    const dayH = 162
 
     weekResult.days.slice(0, 7).forEach((day, dayIndex) => {
       const y = startY + dayIndex * dayH
-      roundedRect(ctx, 58, y, 964, 157, 20)
-      ctx.fillStyle = dayIndex % 2 === 0 ? '#ffffff' : '#f7faf9'
-      ctx.fill()
-      ctx.strokeStyle = '#dce9e5'; ctx.lineWidth = 2; ctx.stroke()
-
-      // top strip: Gregorian | weekday | Hijri
-      ctx.strokeStyle = '#e5efec'; ctx.lineWidth = 1.5
-      ctx.beginPath(); ctx.moveTo(90, y + 58); ctx.lineTo(990, y + 58); ctx.stroke()
-
-      const dateObj = new Date(`${day.date}T00:00:00`)
+      const weekday = formatWeekDay(day.date)
       const gregShort = formatShortGregorian(day.date)
       const hijriShort = formatShortHijri(day.date)
-      const weekday = formatWeekDay(day.date)
+      const isFriday = new Date(`${day.date}T00:00:00`).getDay() === 5
 
+      roundedRect(ctx, tableX, y, tableW, 146, 20)
+
+      if (isFriday) {
+        ctx.fillStyle = '#fff8e7'
+      } else {
+        ctx.fillStyle = dayIndex % 2 === 0 ? '#ffffff' : '#f3f8f6'
+      }
+      ctx.fill()
+
+      ctx.strokeStyle = isFriday ? '#d5b56a' : '#dce9e5'
+      ctx.lineWidth = isFriday ? 3 : 2
+      ctx.stroke()
+
+      // Day name — primary.
       ctx.save()
-      ctx.textBaseline = 'middle'
-
-      ctx.direction = isArabic ? 'rtl' : 'ltr'
-      ctx.textAlign = 'left'
-      ctx.font = `600 20px ${fontFamily}`
-      ctx.fillStyle = '#6f8884'
-      ctx.fillText(gregShort, 96, y + 31)
-
       ctx.textAlign = 'center'
-      ctx.font = `700 28px ${fontFamily}`
-      ctx.fillStyle = '#123f40'
-      ctx.fillText(weekday, 540, y + 31)
+      ctx.textBaseline = 'middle'
+      ctx.direction = isArabic ? 'rtl' : 'ltr'
+      ctx.font = `700 27px ${fontFamily}`
+      ctx.fillStyle = isFriday ? '#9a6c13' : '#123f40'
+      ctx.fillText(weekday, 540, y + 27)
 
-      ctx.textAlign = 'right'
-      ctx.font = `600 20px ${fontFamily}`
-      ctx.fillStyle = '#6f8884'
-      ctx.fillText(hijriShort, 984, y + 31)
+      // Gregorian and Hijri together on a single organized line.
+      ctx.font = `500 19px ${fontFamily}`
+      ctx.fillStyle = '#748a87'
+      ctx.fillText(`${gregShort}  •  ${hijriShort}`, 540, y + 57)
       ctx.restore()
+
+      ctx.strokeStyle = isFriday ? '#ead7a6' : '#e6efed'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(tableX + 26, y + 76)
+      ctx.lineTo(tableX + tableW - 26, y + 76)
+      ctx.stroke()
 
       prayerKeys.forEach((key, i) => {
         const { time, period } = getShareTimeParts(day[key as keyof WeekDay] as string)
         const cx = colXs[i]
+
         ctx.save()
         ctx.textBaseline = 'middle'
         ctx.direction = 'ltr'
-        ctx.textAlign = 'center'
-        ctx.font = `700 29px ${fontFamily}`
-        ctx.fillStyle = '#0d7c75'
-        ctx.fillText(time, cx, y + 102)
 
-        // period always on the visual left
+        ctx.textAlign = 'center'
+        ctx.font = `700 28px ${fontFamily}`
+        ctx.fillStyle = isFriday ? '#8d6b23' : '#0d7c75'
+        ctx.fillText(time, cx + 5, y + 112)
+
+        // ص / م stays visually on the left side of the numeric time.
         ctx.textAlign = 'right'
-        ctx.font = `700 19px ${fontFamily}`
-        ctx.fillText(period, cx - 37, y + 102)
+        ctx.font = `700 18px ${fontFamily}`
+        ctx.fillText(period, cx - 34, y + 112)
         ctx.restore()
       })
     })
 
-    // Footer safely above Instagram controls
-    roundedRect(ctx, 315, 1722, 450, 64, 32)
-    ctx.fillStyle = '#0d7c75'; ctx.fill()
-    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1754, `600 23px ${fontFamily}`, '#ffffff')
-    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1830, `500 26px ${fontFamily}`, '#557471')
+    // CTA, kept safely away from Instagram's bottom controls.
+    roundedRect(ctx, 280, 1660, 520, 72, 36)
+    ctx.fillStyle = '#0b706a'; ctx.fill()
+    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1696, `700 26px ${fontFamily}`, '#ffffff')
+
+    drawCenteredText(
+      ctx,
+      isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times',
+      1770,
+      `600 29px ${fontFamily}`,
+      '#4f716e'
+    )
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create weekly image')), 'image/png', 1)
