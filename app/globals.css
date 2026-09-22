@@ -80,9 +80,19 @@ a { color: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .field { display: grid; gap: 8px; min-width: 0; }
 .field label { color: var(--ink); font-size: .82rem; font-weight: 800; }
-.input-wrap { position: relative; }
+.input-wrap { position: relative; min-width: 0; width: 100%; }
 .input-icon { position: absolute; top: 50%; inset-inline-start: 14px; transform: translateY(-50%); color: #7d9695; pointer-events: none; }
 .form-control { width: 100%; min-height: 48px; padding: 0 15px; border: 1px solid #ccddd8; border-radius: 11px; outline: 0; color: var(--ink); background: #fbfdfc; transition: .2s ease; }
+input[type="date"].form-control {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+input[type="date"].form-control::-webkit-date-and-time-value {
+  text-align: right;
+  min-width: 0;
+}
 .input-wrap .form-control { padding-inline-start: 43px; }
 .form-control:hover { border-color: #a9c6bf; }
 .form-control:focus { border-color: var(--teal); background: #fff; box-shadow: 0 0 0 4px rgba(13,124,117,.09); }
