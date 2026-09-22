@@ -117,15 +117,29 @@ export default function HomePage() {
     })
   }
 
+  function formatHijriDate(value: string) {
+    const parsed = new Date(`${value}T00:00:00`)
+    return new Intl.DateTimeFormat(
+      isArabic ? 'ar-IQ-u-ca-islamic-umalqura' : 'en-u-ca-islamic-umalqura',
+      { year: 'numeric', month: 'long', day: 'numeric' }
+    ).format(parsed)
+  }
 
-  function formatShareTime(value: string) {
+
+
+  function getShareTimeParts(value: string) {
     const match = value.trim().match(/^(\d{1,2}):(\d{2})/)
-    if (!match) return value
+    if (!match) return { time: value, period: '' }
     let hour = Number(match[1])
     const minute = match[2]
     const period = hour >= 12 ? (isArabic ? 'م' : 'PM') : (isArabic ? 'ص' : 'AM')
     hour = hour % 12 || 12
-    return `${hour}:${minute} ${period}`
+    return { time: `${hour}:${minute}`, period }
+  }
+
+  function formatShareTime(value: string) {
+    const { time, period } = getShareTimeParts(value)
+    return isArabic && period ? `${period} ${time}` : `${time} ${period}`.trim()
   }
 
   function buildShareText() {
@@ -133,11 +147,15 @@ export default function HomePage() {
     const cityName = isArabic ? result.city.name_ar : result.city.name_en
     const governorateName = isArabic ? result.city.governorate.name_ar : result.city.governorate.name_en
     const lines = prayerKeys.map(key => `${text.prayer[key as keyof typeof text.prayer]}: ${formatShareTime(result.prayer_times[key])}`)
-    return `${text.prayerTimesFor} ${cityName} - ${governorateName}
-${formatResultDate(result.date)}
+    return `${isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today'}
+${isArabic ? 'المحافظة' : 'Governorate'}: ${governorateName}
+${isArabic ? 'المدينة' : 'City'}: ${cityName}
+${isArabic ? 'الميلادي' : 'Gregorian'}: ${formatResultDate(result.date)}
+${isArabic ? 'الهجري' : 'Hijri'}: ${formatHijriDate(result.date)}
 
 ${lines.join('\n')}
 
+${isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times'}
 ${window.location.origin}`
   }
 
@@ -179,83 +197,141 @@ ${window.location.origin}`
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('Canvas is not supported')
 
+    try {
+      await document.fonts.load('700 60px "IBM Plex Sans Arabic"')
+      await document.fonts.load('500 32px "IBM Plex Sans Arabic"')
+    } catch {}
+
+    const fontFamily = '"IBM Plex Sans Arabic", Arial, sans-serif'
     const cityName = isArabic ? result.city.name_ar : result.city.name_en
     const governorateName = isArabic ? result.city.governorate.name_ar : result.city.governorate.name_en
-    const dateLabel = formatResultDate(result.date)
+    const gregorianDate = formatResultDate(result.date)
+    const hijriDate = formatHijriDate(result.date)
 
     const bg = ctx.createLinearGradient(0, 0, 1080, 1920)
     bg.addColorStop(0, '#edf7f4')
-    bg.addColorStop(.52, '#f9fcfb')
-    bg.addColorStop(1, '#e6f2ef')
+    bg.addColorStop(.52, '#fbfdfc')
+    bg.addColorStop(1, '#e8f3f0')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, 1080, 1920)
 
-    // Soft decorative circles keep the image aligned with the site's visual identity.
-    ctx.globalAlpha = .42
-    ctx.fillStyle = '#cbe8e1'
-    ctx.beginPath(); ctx.arc(940, 170, 245, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = '#f4dfad'
-    ctx.beginPath(); ctx.arc(125, 1675, 185, 0, Math.PI * 2); ctx.fill()
+    ctx.globalAlpha = .38
+    ctx.fillStyle = '#c9e8e0'
+    ctx.beginPath(); ctx.arc(955, 125, 235, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = '#f3dfad'
+    ctx.beginPath(); ctx.arc(80, 1790, 190, 0, Math.PI * 2); ctx.fill()
     ctx.globalAlpha = 1
 
-    // Brand
-    roundedRect(ctx, 390, 105, 300, 76, 38)
+    roundedRect(ctx, 390, 74, 300, 72, 36)
     ctx.fillStyle = '#dff3ee'; ctx.fill()
-    drawCenteredText(ctx, 'IQPR Time', 143, '700 38px Arial, sans-serif', '#073f40')
-    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة' : 'Prayer Times', 255, '700 60px Arial, sans-serif', '#0b3334')
+    drawCenteredText(ctx, 'IQPR Time', 110, `700 37px ${fontFamily}`, '#073f40')
+    drawCenteredText(ctx, isArabic ? 'مواقيت الصلاة لهذا اليوم' : 'Prayer times for today', 220, `700 56px ${fontFamily}`, '#0b3334')
 
-    // Location card
-    roundedRect(ctx, 90, 340, 900, 250, 46)
+    roundedRect(ctx, 70, 295, 940, 355, 42)
     ctx.fillStyle = '#ffffff'; ctx.fill()
-    ctx.strokeStyle = '#d2e6e1'; ctx.lineWidth = 3; ctx.stroke()
-    drawCenteredText(ctx, cityName, 430, '700 68px Arial, sans-serif', '#0a3334')
-    drawCenteredText(ctx, governorateName, 505, '500 34px Arial, sans-serif', '#607b7a')
-    drawCenteredText(ctx, dateLabel, 552, '500 30px Arial, sans-serif', '#7a908e')
+    ctx.strokeStyle = '#d3e6e1'; ctx.lineWidth = 3; ctx.stroke()
 
-    // Prayer rows
-    const startY = 660
-    const rowH = 145
-    prayerKeys.forEach((key, index) => {
-      const y = startY + index * rowH
-      roundedRect(ctx, 90, y, 900, 112, 28)
-      ctx.fillStyle = index % 2 === 0 ? '#ffffff' : '#f5faf8'
-      ctx.fill()
-      ctx.strokeStyle = '#dbeae6'; ctx.lineWidth = 2; ctx.stroke()
+    const infoRows = isArabic
+      ? [
+          ['المحافظة', governorateName],
+          ['المدينة', cityName],
+          ['الميلادي', gregorianDate],
+          ['الهجري', hijriDate],
+        ]
+      : [
+          ['Governorate', governorateName],
+          ['City', cityName],
+          ['Gregorian', gregorianDate],
+          ['Hijri', hijriDate],
+        ]
 
-      const prayerName = text.prayer[key as keyof typeof text.prayer]
+    infoRows.forEach(([label, value], index) => {
+      const y = 355 + index * 72
       ctx.save()
       ctx.textBaseline = 'middle'
       if (isArabic) {
         ctx.direction = 'rtl'
         ctx.textAlign = 'right'
-        ctx.font = '700 38px Arial, sans-serif'
-        ctx.fillStyle = '#173f40'
-        ctx.fillText(prayerName, 895, y + 56)
-        ctx.direction = 'ltr'
-        ctx.textAlign = 'left'
-        ctx.font = '700 44px Arial, sans-serif'
-        ctx.fillStyle = '#0d7c75'
-        ctx.fillText(formatShareTime(result.prayer_times[key]), 185, y + 56)
+        ctx.font = `600 27px ${fontFamily}`
+        ctx.fillStyle = '#78908e'
+        ctx.fillText(label, 925, y)
+        ctx.font = `700 33px ${fontFamily}`
+        ctx.fillStyle = '#123f40'
+        ctx.fillText(value, 755, y)
       } else {
         ctx.direction = 'ltr'
         ctx.textAlign = 'left'
-        ctx.font = '700 38px Arial, sans-serif'
-        ctx.fillStyle = '#173f40'
-        ctx.fillText(prayerName, 185, y + 56)
+        ctx.font = `600 27px ${fontFamily}`
+        ctx.fillStyle = '#78908e'
+        ctx.fillText(label, 155, y)
+        ctx.font = `700 33px ${fontFamily}`
+        ctx.fillStyle = '#123f40'
+        ctx.fillText(value, 330, y)
+      }
+      ctx.restore()
+
+      if (index < infoRows.length - 1) {
+        ctx.strokeStyle = '#e7f0ed'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.moveTo(120, y + 36)
+        ctx.lineTo(960, y + 36)
+        ctx.stroke()
+      }
+    })
+
+    const startY = 715
+    const rowH = 137
+    prayerKeys.forEach((key, index) => {
+      const y = startY + index * rowH
+      roundedRect(ctx, 70, y, 940, 108, 26)
+      ctx.fillStyle = index % 2 === 0 ? '#ffffff' : '#f5faf8'
+      ctx.fill()
+      ctx.strokeStyle = '#dae9e5'
+      ctx.lineWidth = 2
+      ctx.stroke()
+
+      const prayerName = text.prayer[key as keyof typeof text.prayer]
+      const { time, period } = getShareTimeParts(result.prayer_times[key])
+
+      ctx.save()
+      ctx.textBaseline = 'middle'
+      if (isArabic) {
+        ctx.direction = 'rtl'
         ctx.textAlign = 'right'
-        ctx.font = '700 44px Arial, sans-serif'
+        ctx.font = `700 38px ${fontFamily}`
+        ctx.fillStyle = '#173f40'
+        ctx.fillText(prayerName, 915, y + 54)
+
+        ctx.direction = 'ltr'
+        ctx.textAlign = 'left'
+        ctx.font = `700 33px ${fontFamily}`
         ctx.fillStyle = '#0d7c75'
-        ctx.fillText(formatShareTime(result.prayer_times[key]), 895, y + 56)
+        ctx.fillText(period, 135, y + 54)
+
+        ctx.font = `700 45px ${fontFamily}`
+        ctx.fillText(time, 205, y + 54)
+      } else {
+        ctx.direction = 'ltr'
+        ctx.textAlign = 'left'
+        ctx.font = `700 38px ${fontFamily}`
+        ctx.fillStyle = '#173f40'
+        ctx.fillText(prayerName, 135, y + 54)
+
+        ctx.textAlign = 'right'
+        ctx.font = `700 45px ${fontFamily}`
+        ctx.fillStyle = '#0d7c75'
+        ctx.fillText(`${time} ${period}`, 915, y + 54)
       }
       ctx.restore()
     })
 
-    // Footer
-    drawCenteredText(ctx, isArabic ? 'بتوقيت بغداد' : 'Asia/Baghdad timezone', 1585, '600 28px Arial, sans-serif', '#6a8582')
-    roundedRect(ctx, 270, 1650, 540, 86, 43)
-    ctx.fillStyle = '#0d7c75'; ctx.fill()
-    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1693, '700 28px Arial, sans-serif', '#ffffff')
-    drawCenteredText(ctx, isArabic ? 'شاركها مع من تحب' : 'Share with family and friends', 1795, '500 28px Arial, sans-serif', '#718987')
+    roundedRect(ctx, 260, 1605, 560, 84, 42)
+    ctx.fillStyle = '#0d7c75'
+    ctx.fill()
+    drawCenteredText(ctx, 'iqpr-time-neon.vercel.app', 1647, `700 28px ${fontFamily}`, '#ffffff')
+
+    drawCenteredText(ctx, isArabic ? 'شارك الأجر بنشر مواقيت الصلاة' : 'Share the prayer times', 1760, `600 31px ${fontFamily}`, '#476e6b')
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not create image')), 'image/png', 1)
