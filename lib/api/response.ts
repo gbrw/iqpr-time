@@ -92,6 +92,11 @@ export function errorResponse(
       success: false,
       error: { code, message },
     },
-    { status }
+    {
+      status,
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    }
   )
 }
