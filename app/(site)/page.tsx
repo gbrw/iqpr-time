@@ -8,11 +8,12 @@ import { useLanguage } from '@/components/site/LanguageProvider'
 type Governorate = { id: number; name_ar: string; name_en: string; slug: string }
 type City = { id: number; name_ar: string; name_en: string; slug: string }
 type PrayerResult = { city: { name_ar: string; name_en: string; slug: string; governorate: { name_ar: string; name_en: string } }; date: string; prayer_times: Record<string, string> }
+type PrayerKey = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha'
 type WeekDay = { date: string; fajr: string; sunrise: string; dhuhr: string; asr: string; maghrib: string; isha: string }
 type WeekResult = { city: PrayerResult['city']; start_date: string; end_date: string; count: number; days: WeekDay[] }
 
 const prayerIcons = [AlarmClock, Sunrise, Sun, CloudSun, Sunset, MoonStar]
-const prayerKeys = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha']
+const prayerKeys: PrayerKey[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha']
 const todayInBaghdad = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' })
 
 export default function HomePage() {
@@ -728,4 +729,3 @@ ${window.location.origin}`
     <section className="section section-soft"><div className="container developer-panel"><div className="developer-copy"><span className="eyebrow" style={{ color: '#7ed8ca' }}><Braces size={16} /> {text.devEyebrow}</span><h2 className="title-lg">{text.devTitle}</h2><p>{text.devLead}</p><Link href="/docs" className="btn btn-primary">{text.devCta} <Arrow size={17} /></Link></div><div className="developer-code"><div className="code-toolbar"><span>{text.codeLabel}</span><span className="badge">GET</span></div><pre className="code-block"><code>{codeSample}</code></pre></div></div></section>
   </>
 }
-
