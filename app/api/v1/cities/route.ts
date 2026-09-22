@@ -6,7 +6,8 @@ import { ErrorCodes, ErrorMessages } from '@/lib/api/errors'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
-  const governorateSlug = searchParams.get('governorate')
+  const governorateParam = searchParams.get('governorate')
+  const governorateSlug = governorateParam?.trim().toLowerCase() || null
   const governorateIdStr = searchParams.get('governorate_id')
 
   try {
