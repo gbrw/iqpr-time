@@ -22,30 +22,47 @@ export interface DayPrayerTime {
   isha: string
 }
 
-/**
- * Get the active data version from app_settings
- */
-export async function getActiveDataVersion(): Promise<number> {
-  const supabase = getSupabaseClient()
-  const { data } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'active_data_version')
-    .single()
-  return parseInt(data?.value ?? '1', 10)
-}
+const SETTINGS_CACHE_TTL_MS = 60_000
+let settingsCache: Record<string, string> | null = null
+let settingsCacheExpiresAt = 0
+let settingsRequest: Promise<Record<string, string>> | null = null
 
 /**
- * Get app_settings as a key-value map
+ * Get app_settings as a key-value map. The result is shared by every DB/API
+ * consumer so a prayer-times request does not query app_settings twice.
  */
 export async function getAppSettings(): Promise<Record<string, string>> {
   const supabase = getSupabaseClient()
-  const { data } = await supabase.from('app_settings').select('key, value')
+  const { data, error } = await supabase.from('app_settings').select('key, value')
+  if (error) throw new Error(error.message)
+
   const settings: Record<string, string> = {}
-  for (const row of data ?? []) {
-    settings[row.key] = row.value
-  }
+  for (const row of data ?? []) settings[row.key] = row.value
   return settings
+}
+
+export async function getCachedAppSettings(): Promise<Record<string, string>> {
+  const now = Date.now()
+  if (settingsCache && now < settingsCacheExpiresAt) return settingsCache
+  if (settingsRequest) return settingsRequest
+
+  settingsRequest = getAppSettings()
+    .then(settings => {
+      settingsCache = settings
+      settingsCacheExpiresAt = Date.now() + SETTINGS_CACHE_TTL_MS
+      return settings
+    })
+    .finally(() => {
+      settingsRequest = null
+    })
+
+  return settingsRequest
+}
+
+/** Get the active data version from the shared app_settings cache. */
+export async function getActiveDataVersion(): Promise<number> {
+  const settings = await getCachedAppSettings()
+  return parseInt(settings.active_data_version ?? '1', 10)
 }
 
 /**
