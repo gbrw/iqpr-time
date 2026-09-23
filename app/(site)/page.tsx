@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlarmClock, ArrowLeft, ArrowRight, Braces, CalendarDays, CalendarRange, Check, CheckCircle2, ChevronDown, CloudSun, Code2, Copy, Database, Globe2, LoaderCircle, LocateFixed, MapPin, MoonStar, Search, Share2, ShieldCheck, Sparkles, Sun, Sunrise, Sunset, Table2, TerminalSquare, Zap } from 'lucide-react'
 import { useLanguage } from '@/components/site/LanguageProvider'
+import { formatGregorianYmd, formatHijriYmd, getDynamicDateBounds, isFridayYmd, parseYmd } from '@/lib/date/iraq-date'
 
 type Governorate = { id: number; name_ar: string; name_en: string; slug: string }
 type City = { id: number; name_ar: string; name_en: string; slug: string }
@@ -39,6 +40,10 @@ export default function HomePage() {
   const [weekError, setWeekError] = useState('')
   const [weekImageUrl, setWeekImageUrl] = useState('')
   const [sharingWeek, setSharingWeek] = useState(false)
+  const weekSectionRef = useRef<HTMLElement | null>(null)
+  const weekImageBlobRef = useRef<Blob | null>(null)
+  const [weekImageVisible, setWeekImageVisible] = useState(false)
+  const dateBounds = useMemo(() => getDynamicDateBounds(todayInBaghdad()), [])
 
   const text = isArabic ? {
     eyebrow: 'الواجهة العراقية المفتوحة لمواقيت الصلاة', titleA: 'مواقيت دقيقة.', titleB: 'استعلام واحد بسيط.',
@@ -46,7 +51,7 @@ export default function HomePage() {
     try: 'جرّب الاستعلام', docs: 'اقرأ التوثيق', free: 'مجانية بالكامل', noAccount: 'لا تحتاج حساباً', timezone: 'بتوقيت بغداد',
     queryTitle: 'اعرف مواقيت مدينتك', querySub: 'اختر المكان والتاريخ لتحصل على النتيجة فوراً.', gov: 'المحافظة', city: 'المدينة', date: 'التاريخ',
     selectGov: 'اختر المحافظة', selectCity: 'اختر المدينة', loadingCities: 'جاري تحميل المدن...', search: 'عرض المواقيت', searching: 'جاري الاستعلام...',
-    error: 'تعذر جلب البيانات. تحقق من اختياراتك وحاول مجدداً.', missing: 'اختر مدينة وتاريخاً صالحاً أولاً.', copy: 'نسخ رابط API', copied: 'تم النسخ', raw: 'فتح JSON', useLocation: 'استخدم موقعي', locating: 'جارٍ تحديد موقعك...', locationError: 'تعذر تحديد أقرب مدينة. تأكد من السماح للموقع ثم حاول مجدداً.', share: 'مشاركة كصورة', sharing: 'جاري تجهيز الصورة...', copyTimes: 'نسخ المواقيت', timesCopied: 'تم نسخ المواقيت', prayerTimesFor: 'مواقيت الصلاة في', weekTitle: 'مواقيت الصلاة لهذا الأسبوع', weekSub: 'من الأحد إلى السبت', weekLoading: 'جاري تحميل الأسبوع...', weekError: 'تعذر تحميل مواقيت الأسبوع.', gregorian: 'ميلادي', hijri: 'هجري', weekShare: 'مشاركة الأسبوع كصورة', weekSave: 'حفظ صورة الأسبوع', weekPreparing: 'جاري تجهيز صورة الأسبوع...',
+    error: 'تعذر جلب البيانات. تحقق من اختياراتك وحاول مجدداً.', missing: 'اختر مدينة وتاريخاً صالحاً أولاً.', copy: 'نسخ رابط API', copied: 'تم النسخ', raw: 'فتح JSON', useLocation: 'استخدم موقعي', locating: 'جارٍ تحديد موقعك...', locationError: 'تعذر تحديد أقرب مدينة. تأكد من السماح للموقع ثم حاول مجدداً.', share: 'مشاركة كصورة', sharing: 'جاري تجهيز الصورة...', copyTimes: 'نسخ المواقيت', timesCopied: 'تم نسخ المواقيت', clipboardError: 'تعذر النسخ إلى الحافظة.', networkError: 'تعذر الاتصال بالشبكة. تحقق من الإنترنت وحاول مجدداً.', serverError: 'حدث خطأ في الخادم. حاول مجدداً بعد قليل.', prayerTimesFor: 'مواقيت الصلاة في', weekTitle: 'مواقيت الصلاة لهذا الأسبوع', weekSub: 'من الأحد إلى السبت', weekLoading: 'جاري تحميل الأسبوع...', weekError: 'تعذر تحميل مواقيت الأسبوع.', gregorian: 'ميلادي', hijri: 'هجري', weekShare: 'مشاركة الأسبوع كصورة', weekSave: 'حفظ صورة الأسبوع', weekPreparing: 'جاري تجهيز صورة الأسبوع...',
     stats: [['19', 'محافظة عراقية'], ['121', 'مدينة وناحية'], ['44,165', 'سجل موثّق'], ['100', 'طلب في الدقيقة']],
     whyEyebrow: 'مصمّمة للوضوح والاعتمادية', whyTitle: 'كل ما تحتاجه، بدون تعقيد', whyLead: 'واجهة واحدة تخدم المستخدم العادي وتمنح المطور بيانات منظمة يمكن دمجها خلال دقائق.',
     features: [['بحث مرن', 'ابحث باسم المدينة العربي أو الإنجليزي أو استخدم المعرّف البرمجي مباشرة.'], ['استجابة موحّدة', 'صيغة JSON ثابتة وواضحة لليوم أو الشهر أو السنة الكاملة.'], ['حماية واستقرار', 'تحديد ذكي لمعدل الطلبات مع ترويسات أمان وCORS مفتوح.'], ['توقيت صحيح', 'كل التواريخ والأوقات مضبوطة على منطقة Asia/Baghdad.'], ['توثيق تفاعلي', 'أمثلة جاهزة وSwagger ومختبر كامل لتجربة كل نقطة اتصال.'], ['بيانات مدققة', 'فحوص للصيغة والتسلسل والاكتمال قبل نشر كل نسخة بيانات.']],
@@ -58,7 +63,7 @@ export default function HomePage() {
     try: 'Try the query', docs: 'Read the docs', free: 'Completely free', noAccount: 'No account needed', timezone: 'Baghdad time',
     queryTitle: 'Find prayer times', querySub: 'Choose a place and date to get an instant result.', gov: 'Governorate', city: 'City', date: 'Date',
     selectGov: 'Select governorate', selectCity: 'Select city', loadingCities: 'Loading cities...', search: 'Show prayer times', searching: 'Running query...',
-    error: 'We could not load the data. Check your selections and try again.', missing: 'Select a city and a valid date first.', copy: 'Copy API URL', copied: 'Copied', raw: 'Open JSON', useLocation: 'Use my location', locating: 'Locating...', locationError: 'Could not find the nearest city. Allow location access and try again.', share: 'Share as story image', sharing: 'Preparing image...', copyTimes: 'Copy prayer times', timesCopied: 'Prayer times copied', prayerTimesFor: 'Prayer times for', weekTitle: 'Prayer times for this week', weekSub: 'Sunday through Saturday', weekLoading: 'Loading week...', weekError: 'Could not load weekly prayer times.', gregorian: 'Gregorian', hijri: 'Hijri', weekShare: 'Share week as image', weekSave: 'Save weekly image', weekPreparing: 'Preparing weekly image...',
+    error: 'We could not load the data. Check your selections and try again.', missing: 'Select a city and a valid date first.', copy: 'Copy API URL', copied: 'Copied', raw: 'Open JSON', useLocation: 'Use my location', locating: 'Locating...', locationError: 'Could not find the nearest city. Allow location access and try again.', share: 'Share as story image', sharing: 'Preparing image...', copyTimes: 'Copy prayer times', timesCopied: 'Prayer times copied', clipboardError: 'Could not copy to the clipboard.', networkError: 'Network connection failed. Check your internet connection and try again.', serverError: 'The server returned an error. Please try again shortly.', prayerTimesFor: 'Prayer times for', weekTitle: 'Prayer times for this week', weekSub: 'Sunday through Saturday', weekLoading: 'Loading week...', weekError: 'Could not load weekly prayer times.', gregorian: 'Gregorian', hijri: 'Hijri', weekShare: 'Share week as image', weekSave: 'Save weekly image', weekPreparing: 'Preparing weekly image...',
     stats: [['19', 'Governorates'], ['121', 'Cities & districts'], ['44,165', 'Verified records'], ['100', 'Requests per minute']],
     whyEyebrow: 'Built for clarity and reliability', whyTitle: 'Everything you need, without the friction', whyLead: 'One interface works for everyday visitors and gives developers structured data they can integrate in minutes.',
     features: [['Flexible search', 'Find a city by its Arabic or English name, or use its developer-friendly slug.'], ['Consistent responses', 'Stable JSON for a single day, full month, or an entire year.'], ['Safe and reliable', 'Smart rate limiting, security headers, and open CORS support.'], ['Correct timezone', 'All dates and times are aligned to the Asia/Baghdad timezone.'], ['Interactive docs', 'Ready examples, Swagger, and a complete playground for every endpoint.'], ['Validated data', 'Format, chronology, completeness, and duplicate checks before release.']],
@@ -192,10 +197,24 @@ export default function HomePage() {
   }, [storageHydrated, governorate, isArabic, locationSelectionVersion])
 
   useEffect(() => {
+    const target = weekSectionRef.current
+    if (!target || weekImageVisible) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setWeekImageVisible(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '240px 0px' })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [weekResult, weekImageVisible])
+
+  useEffect(() => {
     let cancelled = false
     let objectUrl = ''
 
-    if (!weekResult) {
+    weekImageBlobRef.current = null
+    if (!weekResult || !weekImageVisible) {
       setWeekImageUrl('')
       return
     }
@@ -203,6 +222,7 @@ export default function HomePage() {
     createWeeklyImageBlob()
       .then(blob => {
         if (cancelled) return
+        weekImageBlobRef.current = blob
         objectUrl = URL.createObjectURL(blob)
         setWeekImageUrl(objectUrl)
       })
@@ -210,17 +230,19 @@ export default function HomePage() {
 
     return () => {
       cancelled = true
+      weekImageBlobRef.current = null
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [weekResult, isArabic])
+  }, [weekResult, isArabic, weekImageVisible])
 
   async function loadWeek(selectedCity: string, selectedDate: string) {
     if (!selectedCity || !selectedDate) return
     setLoadingWeek(true)
     setWeekError('')
     setWeekResult(null)
+    setWeekImageVisible(false)
     try {
-      const response = await fetch(`/api/v1/prayer-times/week?city=${encodeURIComponent(selectedCity)}&date=${selectedDate}`, { cache: 'no-store' })
+      const response = await fetch(`/api/v1/prayer-times/week?city=${encodeURIComponent(selectedCity)}&date=${selectedDate}`)
       const body = await response.json()
       if (!response.ok || !body.success) throw new Error()
       setWeekResult(body.data)
@@ -236,48 +258,55 @@ export default function HomePage() {
     if (!city || !date) return setError(text.missing)
     setLoading(true)
     try {
-      const response = await fetch(apiUrl); const body = await response.json()
-      if (!response.ok || !body.success) throw new Error()
+      const response = await fetch(apiUrl)
+      const body = await response.json()
+      if (!response.ok || !body.success) {
+        throw new Error(response.status >= 500 ? 'SERVER_ERROR' : 'API_ERROR')
+      }
       setResult(body.data)
       void loadWeek(city, date)
-    } catch { setError(text.error) } finally { setLoading(false) }
+    } catch (err) {
+      if (!navigator.onLine || err instanceof TypeError) setError(text.networkError)
+      else if (err instanceof Error && err.message === 'SERVER_ERROR') setError(text.serverError)
+      else setError(text.error)
+    } finally { setLoading(false) }
   }
 
   async function copyApiUrl() {
-    await navigator.clipboard.writeText(`${window.location.origin}${apiUrl}`); setCopied(true); window.setTimeout(() => setCopied(false), 1800)
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${apiUrl}`)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setError(text.clipboardError)
+    }
   }
 
 
   function formatResultDate(value: string) {
-    const parsed = new Date(`${value}T00:00:00`)
-    return parsed.toLocaleDateString(isArabic ? 'ar-IQ' : 'en-GB', {
+    return formatGregorianYmd(value, isArabic ? 'ar-IQ' : 'en-GB', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     })
   }
 
   function formatHijriDate(value: string) {
-    const parsed = new Date(`${value}T00:00:00`)
-    return new Intl.DateTimeFormat(
+    return formatHijriYmd(
+      value,
       isArabic ? 'ar-IQ-u-ca-islamic-umalqura' : 'en-u-ca-islamic-umalqura',
       { year: 'numeric', month: 'long', day: 'numeric' }
-    ).format(parsed)
+    )
   }
 
-
-
   function formatWeekDay(value: string) {
-    const parsed = new Date(`${value}T00:00:00`)
-    return parsed.toLocaleDateString(isArabic ? 'ar-IQ' : 'en-GB', { weekday: 'short' })
+    return formatGregorianYmd(value, isArabic ? 'ar-IQ' : 'en-GB', { weekday: 'short' })
   }
 
   function formatShortGregorian(value: string) {
-    const parsed = new Date(`${value}T00:00:00`)
-    return parsed.toLocaleDateString(isArabic ? 'ar-IQ' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return formatGregorianYmd(value, isArabic ? 'ar-IQ' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
   function formatShortHijri(value: string) {
-    const parsed = new Date(`${value}T00:00:00`)
-    return new Intl.DateTimeFormat(isArabic ? 'ar-IQ-u-ca-islamic-umalqura' : 'en-u-ca-islamic-umalqura', { day: 'numeric', month: 'short', year: 'numeric' }).format(parsed)
+    return formatHijriYmd(value, isArabic ? 'ar-IQ-u-ca-islamic-umalqura' : 'en-u-ca-islamic-umalqura', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
   function getShareTimeParts(value: string) {
@@ -314,9 +343,13 @@ ${window.location.origin}`
 
   async function copyPrayerTimes() {
     if (!result) return
-    await navigator.clipboard.writeText(buildShareText())
-    setResultCopied(true)
-    window.setTimeout(() => setResultCopied(false), 1800)
+    try {
+      await navigator.clipboard.writeText(buildShareText())
+      setResultCopied(true)
+      window.setTimeout(() => setResultCopied(false), 1800)
+    } catch {
+      setError(text.clipboardError)
+    }
   }
 
   function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
@@ -358,11 +391,11 @@ ${window.location.origin}`
     const fontFamily = '"IBM Plex Sans Arabic", Arial, sans-serif'
     const cityName = isArabic ? result.city.name_ar : result.city.name_en
     const governorateName = isArabic ? result.city.governorate.name_ar : result.city.governorate.name_en
-    const dateObj = new Date(`${result.date}T00:00:00`)
-    const gregDay = new Intl.DateTimeFormat('en-GB', { day: '2-digit' }).format(dateObj)
-    const gregMonth = new Intl.DateTimeFormat(isArabic ? 'ar-IQ' : 'en-GB', { month: 'long' }).format(dateObj)
-    const gregYear = new Intl.DateTimeFormat('en-GB', { year: 'numeric' }).format(dateObj)
-    const weekDay = new Intl.DateTimeFormat(isArabic ? 'ar-IQ' : 'en-GB', { weekday: 'long' }).format(dateObj)
+    const dateObj = parseYmd(result.date)
+    const gregDay = new Intl.DateTimeFormat('en-GB', { day: '2-digit', timeZone: 'Asia/Baghdad' }).format(dateObj)
+    const gregMonth = new Intl.DateTimeFormat(isArabic ? 'ar-IQ' : 'en-GB', { month: 'long', timeZone: 'Asia/Baghdad' }).format(dateObj)
+    const gregYear = new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: 'Asia/Baghdad' }).format(dateObj)
+    const weekDay = new Intl.DateTimeFormat(isArabic ? 'ar-IQ' : 'en-GB', { weekday: 'long', timeZone: 'Asia/Baghdad' }).format(dateObj)
 
     const hijriParts = new Intl.DateTimeFormat(
       isArabic ? 'ar-IQ-u-ca-islamic-umalqura' : 'en-u-ca-islamic-umalqura',
@@ -614,7 +647,7 @@ ${window.location.origin}`
       const weekday = formatWeekDay(day.date)
       const gregShort = formatShortGregorian(day.date)
       const hijriShort = formatShortHijri(day.date)
-      const isFriday = new Date(`${day.date}T00:00:00`).getDay() === 5
+      const isFriday = isFridayYmd(day.date)
 
       roundedRect(ctx, tableX, y, tableW, 146, 20)
 
@@ -695,7 +728,7 @@ ${window.location.origin}`
     if (!weekResult || sharingWeek) return
     setSharingWeek(true)
     try {
-      const blob = await createWeeklyImageBlob()
+      const blob = weekImageBlobRef.current ?? await createWeeklyImageBlob()
       const file = new File([blob], `iqpr-${weekResult.city.slug}-${weekResult.start_date}-7days.png`, { type: 'image/png' })
       const title = isArabic ? `مواقيت الصلاة لهذا الأسبوع - ${weekResult.city.name_ar}` : `Prayer times for this week - ${weekResult.city.name_en}`
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -721,7 +754,7 @@ ${window.location.origin}`
 
   async function saveWeeklyImage() {
     if (!weekResult) return
-    const blob = await createWeeklyImageBlob()
+    const blob = weekImageBlobRef.current ?? await createWeeklyImageBlob()
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -818,7 +851,7 @@ ${window.location.origin}`
   setResult(null)
   setWeekResult(null)
 }}><option value="">{loadingCities ? text.loadingCities : text.selectCity}</option>{cities.map(item => <option key={item.id} value={item.slug}>{isArabic ? item.name_ar : item.name_en}</option>)}</select></div></div>
-        </div><div className="field"><label htmlFor="home-date">{text.date}</label><div className="date-picker-wrap"><div className="date-display" aria-hidden="true"><CalendarDays size={17} /><span>{date ? new Date(`${date}T00:00:00`).toLocaleDateString(isArabic ? 'ar-IQ' : 'en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }) : text.date}</span></div><input id="home-date" type="date" className="date-native-input" value={date} onChange={e => { setDate(e.target.value); setResult(null) }} min="2026-01-01" max="2026-12-31" aria-label={text.date} /></div></div>{error && <div className="query-error"><ShieldCheck size={16} /> {error}</div>}<button className="btn btn-primary btn-lg w-full" disabled={loading || loadingCities}>{loading ? <LoaderCircle className="spin" size={19} /> : <Search size={19} />}{loading ? text.searching : text.search}</button></form>
+        </div><div className="field"><label htmlFor="home-date">{text.date}</label><div className="date-picker-wrap"><div className="date-display" aria-hidden="true"><CalendarDays size={17} /><span>{date ? formatGregorianYmd(date, isArabic ? 'ar-IQ' : 'en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }) : text.date}</span></div><input id="home-date" type="date" className="date-native-input" value={date} onChange={e => { setDate(e.target.value); setResult(null) }} min={dateBounds.min} max={dateBounds.max} aria-label={text.date} /></div></div>{error && <div className="query-error"><ShieldCheck size={16} /> {error}</div>}<button className="btn btn-primary btn-lg w-full" disabled={loading || loadingCities}>{loading ? <LoaderCircle className="spin" size={19} /> : <Search size={19} />}{loading ? text.searching : text.search}</button></form>
         {result && <div className="result-panel">
           <div className="result-context result-context-premium">
             <div className="result-context-icon"><MapPin size={19} /></div>
@@ -829,7 +862,7 @@ ${window.location.origin}`
           <div className="result-actions primary-actions"><button type="button" className="btn btn-primary btn-sm" onClick={sharePrayerTimes} disabled={sharingStory}>{sharingStory ? <LoaderCircle className="spin" size={15} /> : <Share2 size={15} />} {sharingStory ? text.sharing : text.share}</button><button type="button" className="btn btn-secondary btn-sm" onClick={copyPrayerTimes}>{resultCopied ? <Check size={15} /> : <Copy size={15} />}{resultCopied ? text.timesCopied : text.copyTimes}</button></div>
           <div className="result-actions secondary-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={copyApiUrl}>{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? text.copied : text.copy}</button><a className="btn btn-ghost btn-sm" href={apiUrl} target="_blank" rel="noreferrer"><Braces size={15} /> {text.raw}</a></div>
 
-          <section className="week-panel" aria-labelledby="week-title">
+          <section ref={weekSectionRef} className="week-panel" aria-labelledby="week-title">
             <div className="week-head"><div className="week-head-icon"><CalendarRange size={20} /></div><div><h3 id="week-title">{text.weekTitle}</h3><p>{text.weekSub}</p></div>{weekResult && <span className="week-range">{formatShortGregorian(weekResult.start_date)} — {formatShortGregorian(weekResult.end_date)}</span>}</div>
             {loadingWeek && <div className="week-state"><LoaderCircle className="spin" size={18} /> {text.weekLoading}</div>}
             {weekError && !loadingWeek && <div className="week-state week-state-error"><ShieldCheck size={17} /> {weekError}<button type="button" className="btn btn-ghost btn-sm" onClick={() => loadWeek(city, date)}>{isArabic ? 'إعادة المحاولة' : 'Retry'}</button></div>}
