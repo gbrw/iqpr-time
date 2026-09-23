@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAppSettings } from '@/lib/db/prayer-times'
+import { getCachedAppSettings } from '@/lib/db/prayer-times'
 
 export interface SuccessResponse<T = unknown> {
   success: true
@@ -31,16 +31,6 @@ const SOURCE_INFO = {
     'هذه الخدمة مشروع تقني مستقل وغير تابعة رسمياً لديوان الوقف السني.',
 }
 
-let settingsCache: Record<string, string> | null = null
-let settingsCacheExpiresAt = 0
-
-async function getCachedSettings() {
-  if (settingsCache && Date.now() < settingsCacheExpiresAt) return settingsCache
-  settingsCache = await getAppSettings()
-  settingsCacheExpiresAt = Date.now() + 60_000
-  return settingsCache
-}
-
 /**
  * Build a success response with standard envelope
  */
@@ -58,7 +48,7 @@ export async function successResponse<T>(
 
   // Try to enrich meta from DB settings
   try {
-    const settings = await getCachedSettings()
+    const settings = await getCachedAppSettings()
     meta = {
       version: parseInt(settings.active_data_version ?? '1', 10),
       timezone: 'Asia/Baghdad',
@@ -75,7 +65,12 @@ export async function successResponse<T>(
       data,
       meta,
     },
-    { status }
+    {
+      status,
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    }
   )
 }
 
