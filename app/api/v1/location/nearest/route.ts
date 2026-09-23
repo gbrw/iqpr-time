@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCities, type City } from '@/lib/db/cities'
+import { getCachedLocation, getLocationCacheKey, setCachedLocation } from '@/lib/api/location-cache'
 
 function normalize(value: string) {
   return value
@@ -136,6 +137,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const cacheKey = getLocationCacheKey(lat, lon)
+    const cached = await getCachedLocation<{ city: City; matched_locality: string | null }>(cacheKey)
+    if (cached) {
+      return NextResponse.json(
+        { success: true, data: cached },
+        { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } }
+      )
+    }
+
     const url = new URL('https://nominatim.openstreetmap.org/reverse')
     url.searchParams.set('format', 'jsonv2')
     url.searchParams.set('lat', String(lat))
@@ -149,7 +159,7 @@ export async function GET(request: NextRequest) {
         'User-Agent': 'IQPR-Time/1.0 (https://iqpr-time-neon.vercel.app)',
         'Accept-Language': 'ar,en;q=0.8',
       },
-      cache: 'no-store',
+      next: { revalidate: 86400 },
     })
 
     if (!response.ok) throw new Error('Reverse geocoding failed')
@@ -193,22 +203,25 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        city: {
-          id: city.id,
-          name_ar: city.name_ar,
-          name_en: city.name_en,
-          slug: city.slug,
-          governorate_id: city.governorate_id,
-          governorate_name_ar: city.governorate_name_ar,
-          governorate_name_en: city.governorate_name_en,
-          governorate_slug: city.governorate_slug,
-        },
-        matched_locality: candidates[0] ?? null,
+    const data = {
+      city: {
+        id: city.id,
+        name_ar: city.name_ar,
+        name_en: city.name_en,
+        slug: city.slug,
+        governorate_id: city.governorate_id,
+        governorate_name_ar: city.governorate_name_ar,
+        governorate_name_en: city.governorate_name_en,
+        governorate_slug: city.governorate_slug,
       },
-    }, { headers: { 'Cache-Control': 'no-store' } })
+      matched_locality: candidates[0] ?? null,
+    }
+
+    await setCachedLocation(cacheKey, data)
+    return NextResponse.json(
+      { success: true, data },
+      { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } }
+    )
   } catch (error) {
     console.error('[location/nearest]', error)
     return NextResponse.json(
